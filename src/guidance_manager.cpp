@@ -65,6 +65,10 @@ e_sdk_err_code GuidanceManager::init(ros::NodeHandle pnh) {
       0.785398;  // TODO defaulted to 45 degrees in radians; need real value
   ultrasonic_msg_.min_range = 0.1;
   ultrasonic_msg_.max_range = 8.0;
+  // Set disparity image constants
+  image_disparity_.delta_d = 0.0625;
+  image_disparity_.valid_window.x_offset = 70;
+  image_disparity_.valid_window.y_offset = 0;
 
   // Start configuring the Guidance
   e_sdk_err_code err_code = static_cast<e_sdk_err_code>(reset_config());
@@ -100,25 +104,25 @@ e_sdk_err_code GuidanceManager::init(ros::NodeHandle pnh) {
     depth_pnh_[i] = ros::NodeHandle(pnh_, "cam" + std::to_string(i) + "/depth");
     left_pnh_[i] = ros::NodeHandle(pnh_, "cam" + std::to_string(i) + "/left");
     right_pnh_[i] = ros::NodeHandle(pnh_, "cam" + std::to_string(i) + "/right");
-
+ 
     // init camera puplishers
     if (config.isDepthEnabled(i)) {
       createDepthPublisher(depth_pnh_[i], i,
-                           "calibration_files/camera_params_left.ini");
+                           "calibration_files/camera_params_left" + std::to_string(i) + ".ini");
       std::cout << "select depth" << std::endl;
       select_depth_image(static_cast<e_vbus_index>(i));
     }
 
     if (config.isCamEnabled(i, GuidanceConfiguration::cam_right)) {
       createImagePublisher(right_pnh_[i], i,
-                           "calibration_files/camera_params_right.ini", false);
+                           "calibration_files/camera_params_right" + std::to_string(i) + ".ini", false);
       std::cout << "select right" << std::endl;
       select_greyscale_image(static_cast<e_vbus_index>(i), CAM_RIGHT);
     }
 
     if (config.isCamEnabled(i, GuidanceConfiguration::cam_left)) {
       createImagePublisher(left_pnh_[i], i,
-                           "calibration_files/camera_params_left.ini", true);
+                           "calibration_files/camera_params_left"+std::to_string(i)+".ini", true);
       std::cout << "select left" << std::endl;
       select_greyscale_image(static_cast<e_vbus_index>(i), CAM_LEFT);
     }
@@ -341,6 +345,7 @@ void GuidanceManager::image_handler(int data_len, char *content) {
       image_disparity_.header.stamp = time;
       image_disparity_.f = calibration_params[i].focal;
       image_disparity_.T = calibration_params[i].baseline;
+      disparity_image_pub_[i].publish(image_disparity_);
     }
   }
 }

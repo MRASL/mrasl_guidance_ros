@@ -86,6 +86,7 @@ class GuidanceManager {
 
   ros::NodeHandle pnh_;
   ros::NodeHandle depth_pnh_[CAMERA_PAIR_NUM];
+  ros::NodeHandle disp_pnh_[CAMERA_PAIR_NUM];
   ros::NodeHandle left_pnh_[CAMERA_PAIR_NUM];
   ros::NodeHandle right_pnh_[CAMERA_PAIR_NUM];
   static GuidanceManager *s_instance_;
