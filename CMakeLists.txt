@@ -1,10 +1,6 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(guidance)
 
-execute_process(
-  COMMAND "clang-format-3.6 -style=Google -sort-includes -i ./**/*.cpp ./**/*.hpp ./**/*.h"
-)
-
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   cv_bridge
@@ -12,9 +8,14 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
   image_transport
   geometry_msgs
+  dynamic_reconfigure
 )
 
 find_package(OpenCV REQUIRED)
+
+generate_dynamic_reconfigure_options(
+  cfg/guidance.cfg
+)
 
 catkin_package(
   INCLUDE_DIRS include
@@ -24,6 +25,7 @@ catkin_package(
                   sensor_msgs
                   image_transport
                   geometry_msgs
+                  dynamic_reconfigure
 )
 
 include_directories(
@@ -56,6 +58,8 @@ include_directories(
 add_executable( guidance
   ${PROJECT_SOURCE_DIR}/src/guidance_node.cpp
 )
+
+add_dependencies(guidance ${PROJECT_NAME}_gencfg)
 
 target_link_libraries( guidance
 #  DJI_guidance

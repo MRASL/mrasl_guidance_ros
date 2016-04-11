@@ -21,6 +21,7 @@
   <depend>cv_bridge</depend>
   <depend>geometry_msgs</depend>
   <depend>image_transport</depend>
+  <depend>dynamic_reconfigure</depend>
 
   <export>
   </export>
