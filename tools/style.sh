@@ -1,1 +1,1 @@
-clang-format-3.6 -style=Google -sort-includes -i ./**/*.cpp ../**/*.hpp ../**/*.h
+clang-format-3.6 -style=Google -i ./**/*.cpp ./**/*.hpp ./**/*.h
