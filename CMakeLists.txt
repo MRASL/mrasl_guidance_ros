@@ -59,7 +59,9 @@ add_executable( guidance
   ${PROJECT_SOURCE_DIR}/src/guidance_node.cpp
 )
 
-add_dependencies(guidance ${PROJECT_NAME}_gencfg)
+add_dependencies(guidance
+  ${PROJECT_NAME}_gencfg
+)
 
 target_link_libraries( guidance
 #  DJI_guidance
