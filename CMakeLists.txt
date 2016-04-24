@@ -57,6 +57,8 @@ include_directories(
 
 add_executable( guidance
   ${PROJECT_SOURCE_DIR}/src/guidance_node.cpp
+  ${PROJECT_SOURCE_DIR}/src/guidance_manager.cpp
+  ${PROJECT_SOURCE_DIR}/src/dji/utils.cpp
 )
 
 add_dependencies(guidance

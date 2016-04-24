@@ -1,7 +1,10 @@
 #include <ros/ros.h>
-
 #include <dynamic_reconfigure/server.h>
+
+#include <dji/utils.h>
+#include <dji/guidance.h>
 #include <guidance/guidanceConfig.h>
+#include "guidance_manager.hpp"
 
 void config_callback(guidance::guidanceConfig &config, uint32_t level) {}
 
