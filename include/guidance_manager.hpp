@@ -5,13 +5,12 @@
 #include <dji/guidance.h>
 #include <opencv2/opencv.hpp>
 
-const unsigned int IMG_WIDTH = 320;
-const unsigned int IMG_HEIGHT = 240;
-const unsigned int IMG_SIZE = (IMG_WIDTH * IMG_HEIGHT);
+
 
 class GuidanceManager {
 public:
   GuidanceManager(const ros::NodeHandle& pnh);
+  ~GuidanceManager();
 
   dji::e_sdk_err_code enable_imu();
   dji::e_sdk_err_code enable_ultrasonic();
@@ -31,7 +30,18 @@ public:
 private:
   ros::NodeHandle pnh_;
 
-  //cv::Mat image_left_(IMG_HEIGHT, IMG_WIDTH, cv::CV_8UC1);
+#define IMG_WIDTH 320
+#define IMG_HEIGHT 240
+#define IMG_SIZE (IMG_WIDTH * IMG_HEIGHT)
+
+  // Buffer images
+  cv::Mat image_left_;
+  cv::Mat image_right_;
+  cv::Mat image_depth_;
+
+  dji::stereo_cali calibration_params[5];
+
+  dji::e_sdk_err_code init();
 
 };
 
