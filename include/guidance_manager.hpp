@@ -1,48 +1,96 @@
 #ifndef GUIDANCE_MANAGER_HPP
 #define GUIDANCE_MANAGER_HPP
+#include <vector>
 
 #include <ros/ros.h>
+#include <image_transport/image_transport.h>
+
 #include <dji/guidance.h>
 #include <opencv2/opencv.hpp>
 
-
-
+/**
+ * @brief The GuidanceManager class
+ * @note Due to the C nature of the DJI library, some stuff in this class had to
+ * be static.
+ * Because of this, might as well follow a singleton pattern and hopefully
+ * everything works out.
+ */
 class GuidanceManager {
-public:
-  GuidanceManager(const ros::NodeHandle& pnh);
+ public:
   ~GuidanceManager();
 
-  dji::e_sdk_err_code enable_imu();
-  dji::e_sdk_err_code enable_ultrasonic();
-  dji::e_sdk_err_code enable_obstacle_distance();
-  dji::e_sdk_err_code enable_velocity();
-  dji::e_sdk_err_code enable_motion();
-  dji::e_sdk_err_code enable_greyscale_image(dji::e_vbus_index cam_id);
-  dji::e_sdk_err_code enable_dept_image(dji::e_vbus_index cam_id);
+  static GuidanceManager& getInstance() {
+    static GuidanceManager s_instance_;
+    return s_instance_;
+  }
 
-  dji::e_sdk_err_code disable_imu();
-  dji::e_sdk_err_code disable_ultrasonic();
-  dji::e_sdk_err_code disable_obstacle_distance();
-  dji::e_sdk_err_code disable_velocity();
-  dji::e_sdk_err_code disable_motion();
-  dji::e_sdk_err_code disable_greyscale_image(dji::e_vbus_index cam_id);
-  dji::e_sdk_err_code disable_dept_image(dji::e_vbus_index cam_id);
-private:
-  ros::NodeHandle pnh_;
+  static void setNodeHandle(ros::NodeHandle pnh) { pnh_ = pnh; }
+
+  e_sdk_err_code enable_imu();
+  e_sdk_err_code enable_ultrasonic();
+  e_sdk_err_code enable_obstacle_distance();
+  e_sdk_err_code enable_velocity();
+  e_sdk_err_code enable_motion();
+  e_sdk_err_code enable_greyscale_image(e_vbus_index cam_id);
+  e_sdk_err_code enable_depth_image(e_vbus_index cam_id);
+
+  e_sdk_err_code disable_imu();
+  e_sdk_err_code disable_ultrasonic();
+  e_sdk_err_code disable_obstacle_distance();
+  e_sdk_err_code disable_velocity();
+  e_sdk_err_code disable_motion();
+  e_sdk_err_code disable_greyscale_image(e_vbus_index cam_id);
+  e_sdk_err_code disable_depth_image(e_vbus_index cam_id);
+
+  // Alright at this point I have to admit this is spaghetti
+  // code with extra meatballs
+  void image_handler(int data_len, char *content);
+  void imu_handler(int data_len, char *content);
+  void ultrasonic_handler(int data_len, char *content);
+  void motion_handler(int data_len, char *content);
+  void velocity_handler(int data_len, char *content);
+  void obstacle_handler(int data_len, char *content);
+
+ private:
+  static ros::NodeHandle pnh_;
+  GuidanceManager();  // Purposely hide the damn things
+  GuidanceManager(GuidanceManager const&);
+  void operator=(GuidanceManager const&);
 
 #define IMG_WIDTH 320
 #define IMG_HEIGHT 240
 #define IMG_SIZE (IMG_WIDTH * IMG_HEIGHT)
+#define CAMERA_PAIR_NUM 5
 
   // Buffer images
   cv::Mat image_left_;
   cv::Mat image_right_;
   cv::Mat image_depth_;
 
-  dji::stereo_cali calibration_params[5];
+  std::vector<int> enabled_cameras = {1};
 
-  dji::e_sdk_err_code init();
+  stereo_cali calibration_params[5];
 
+  e_sdk_err_code init();
+
+  /**
+   * @brief guidance_data_rcvd_cb
+   * Call back to dispatch data to the right handler
+   * Some C/C++ hackery going on here
+   */
+  //int guidance_data_rcvd_cb(int event, int data_len, char *content);
+
+  // publishers
+  image_transport::ImageTransport it_;
+  image_transport::Publisher depth_image_pub_[CAMERA_PAIR_NUM];
+  image_transport::Publisher left_image_pub_[CAMERA_PAIR_NUM];
+  image_transport::Publisher right_image_pub_[CAMERA_PAIR_NUM];
+  image_transport::Publisher disparity_image_pub_[CAMERA_PAIR_NUM];
+  ros::Publisher imu_pub_;
+  ros::Publisher obstacle_distance_pub_;
+  ros::Publisher velocity_pub_;
+  ros::Publisher ultrasonic_pub_;
+  ros::Publisher position_pub_;
 };
 
-#endif // GUIDANCE_MANAGER_HPP
+#endif  // GUIDANCE_MANAGER_HPP

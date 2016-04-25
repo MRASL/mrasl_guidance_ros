@@ -7,7 +7,7 @@
 #define SDK_API extern
 #endif
 
-namespace dji {
+
 
 #define CAMERA_PAIR_NUM 5
 
@@ -417,6 +417,5 @@ SDK_API int wait_for_board_ready();
 */
 SDK_API int set_exposure_param(exposure_param *param);
 
-}  // namespace dji
 
 #endif  // GUIDANCE_H

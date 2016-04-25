@@ -6,7 +6,9 @@
 #include <guidance/guidanceConfig.h>
 #include "guidance_manager.hpp"
 
-void config_callback(guidance::guidanceConfig &config, uint32_t level) {}
+void config_callback(guidance::guidanceConfig &config, uint32_t level) {
+
+}
 
 int main(int argc, char *argv[]) {
   ros::init(argc, argv, "guidance_node");
