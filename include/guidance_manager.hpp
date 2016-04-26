@@ -4,6 +4,9 @@
 
 #include <ros/ros.h>
 #include <image_transport/image_transport.h>
+#include <cv_bridge/cv_bridge.h>
+#include <stereo_msgs/DisparityImage.h>
+#include <sensor_msgs/Imu.h>
 
 #include <dji/guidance.h>
 #include <opencv2/opencv.hpp>
@@ -17,14 +20,14 @@
  */
 class GuidanceManager {
  public:
-  ~GuidanceManager();
-
-  static GuidanceManager& getInstance() {
-    static GuidanceManager s_instance_;
+  // Singleton pattern
+  static GuidanceManager *getInstance() {
+    if (s_instance_ == NULL) s_instance_ = new GuidanceManager;
     return s_instance_;
   }
 
-  static void setNodeHandle(ros::NodeHandle pnh) { pnh_ = pnh; }
+  // static void setNodeHandle(ros::NodeHandle pnh) { pnh_ = pnh; }
+  e_sdk_err_code init(ros::NodeHandle pnh);
 
   e_sdk_err_code enable_imu();
   e_sdk_err_code enable_ultrasonic();
@@ -52,40 +55,39 @@ class GuidanceManager {
   void obstacle_handler(int data_len, char *content);
 
  private:
-  static ros::NodeHandle pnh_;
-  GuidanceManager();  // Purposely hide the damn things
-  GuidanceManager(GuidanceManager const&);
-  void operator=(GuidanceManager const&);
+  ros::NodeHandle pnh_;
+  static GuidanceManager *s_instance_;
+  GuidanceManager() {}  // Purposely hide the damn things
+  GuidanceManager(GuidanceManager const &);
+  void operator=(GuidanceManager const &);
 
 #define IMG_WIDTH 320
 #define IMG_HEIGHT 240
-#define IMG_SIZE (IMG_WIDTH * IMG_HEIGHT)
+#define IMG_SIZE 76800
 #define CAMERA_PAIR_NUM 5
 
-  // Buffer images
-  cv::Mat image_left_;
-  cv::Mat image_right_;
-  cv::Mat image_depth_;
-
-  std::vector<int> enabled_cameras = {1};
-
+  // Message buffers
+  cv_bridge::CvImage image_left_;
+  cv_bridge::CvImage image_right_;
+  cv_bridge::CvImage image_depth_;
+  cv_bridge::CvImage image_cv_disparity_;
+  stereo_msgs::DisparityImage image_disparity_;
   stereo_cali calibration_params[5];
-
-  e_sdk_err_code init();
+  sensor_msgs::Imu imu_msg_;
 
   /**
    * @brief guidance_data_rcvd_cb
    * Call back to dispatch data to the right handler
    * Some C/C++ hackery going on here
    */
-  //int guidance_data_rcvd_cb(int event, int data_len, char *content);
+  // static int guidance_data_rcvd_cb(int event, int data_len, char *content);
 
   // publishers
-  image_transport::ImageTransport it_;
+  image_transport::ImageTransport *it_;
   image_transport::Publisher depth_image_pub_[CAMERA_PAIR_NUM];
   image_transport::Publisher left_image_pub_[CAMERA_PAIR_NUM];
   image_transport::Publisher right_image_pub_[CAMERA_PAIR_NUM];
-  image_transport::Publisher disparity_image_pub_[CAMERA_PAIR_NUM];
+  ros::Publisher disparity_image_pub_[CAMERA_PAIR_NUM];
   ros::Publisher imu_pub_;
   ros::Publisher obstacle_distance_pub_;
   ros::Publisher velocity_pub_;
