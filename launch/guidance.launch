@@ -1,0 +1,6 @@
+<launch>
+  <node pkg="guidance" type="guidance" name="guidance" output="screen">
+
+  </node>
+
+</launch>
