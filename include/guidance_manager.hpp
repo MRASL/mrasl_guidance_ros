@@ -7,6 +7,8 @@
 #include <cv_bridge/cv_bridge.h>
 #include <stereo_msgs/DisparityImage.h>
 #include <sensor_msgs/Imu.h>
+#include <geometry_msgs/TwistStamped.h>
+#include <geometry_msgs/PoseStamped.h>
 
 #include <dji/guidance.h>
 #include <opencv2/opencv.hpp>
@@ -74,6 +76,9 @@ class GuidanceManager {
   stereo_msgs::DisparityImage image_disparity_;
   stereo_cali calibration_params[5];
   sensor_msgs::Imu imu_msg_;
+  geometry_msgs::TwistStamped twist_body_msg_;
+  geometry_msgs::TwistStamped twist_global_msg_;
+  geometry_msgs::PoseStamped pose_msg_;
 
   /**
    * @brief guidance_data_rcvd_cb
@@ -90,9 +95,10 @@ class GuidanceManager {
   ros::Publisher disparity_image_pub_[CAMERA_PAIR_NUM];
   ros::Publisher imu_pub_;
   ros::Publisher obstacle_distance_pub_;
-  ros::Publisher velocity_pub_;
+  ros::Publisher velocity_body_pub_;
+  ros::Publisher velocity_global_pub_;
   ros::Publisher ultrasonic_pub_;
-  ros::Publisher position_pub_;
+  ros::Publisher pose_pub_;
 };
 
 #endif  // GUIDANCE_MANAGER_HPP

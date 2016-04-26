@@ -10,6 +10,8 @@
 #include <sensor_msgs/Imu.h>
 #include <sensor_msgs/LaserScan.h>
 #include <geometry_msgs/Vector3Stamped.h>
+#include <geometry_msgs/TwistStamped.h>
+#include <geometry_msgs/TwistWithCovarianceStamped.h>
 
 #include <dji/guidance.h>
 #include "guidance_manager.hpp"
@@ -57,6 +59,9 @@ e_sdk_err_code GuidanceManager::init(ros::NodeHandle pnh) {
   imu_msg_.angular_velocity_covariance = {-1};
   imu_msg_.linear_acceleration_covariance =
       imu_msg_.orientation_covariance = {0};
+  //Set angular twist to 0
+  twist_body_msg_.twist.angular.x = twist_body_msg_.twist.angular.y = twist_body_msg_.twist.angular.z = 0;
+  twist_global_msg_.twist.angular.x = twist_global_msg_.twist.angular.y = twist_global_msg_.twist.angular.z = 0;
 
   // init image publishers
   for (int i = 0; i < CAMERA_PAIR_NUM; ++i) {
@@ -72,9 +77,10 @@ e_sdk_err_code GuidanceManager::init(ros::NodeHandle pnh) {
   imu_pub_ = pnh_.advertise<sensor_msgs::Imu>("imu", 10);
   obstacle_distance_pub_ =
       pnh_.advertise<sensor_msgs::LaserScan>("obstacle_distance", 10);
-  velocity_pub_ = pnh_.advertise<sensor_msgs::Imu>("velocity", 10);
+  velocity_body_pub_ = pnh_.advertise<geometry_msgs::TwistStamped>("~/body/velocity", 10);
+  velocity_global_pub_ = pnh_.advertise<geometry_msgs::TwistWithCovarianceStamped>("~/global/velocity", 10);
   ultrasonic_pub_ = pnh_.advertise<sensor_msgs::LaserScan>("sonar", 10);
-  position_pub_ = pnh_.advertise<geometry_msgs::Vector3Stamped>("position", 10);
+  pose_pub_ = pnh_.advertise<geometry_msgs::PoseStamped>("pose", 10);
 
   // Start configuring the Guidance
   e_sdk_err_code err_code = static_cast<e_sdk_err_code>(reset_config());
@@ -207,9 +213,37 @@ void GuidanceManager::ultrasonic_handler(int data_len, char *content) {
   }
 }
 
-void GuidanceManager::motion_handler(int data_len, char *content) {}
+void GuidanceManager::motion_handler(int data_len, char *content) {
+  motion* m=(motion*)content;
+  ros::Time now = ros::Time::now();
+  pose_msg_.header.frame_id = "local_origin";
+  pose_msg_.header.stamp = now;
+  pose_msg_.pose.position.x = m->position_in_global_x;
+  pose_msg_.pose.position.y = m->position_in_global_y;
+  pose_msg_.pose.position.z = m->position_in_global_z;
+  pose_msg_.pose.orientation.w = m->q0;
+  pose_msg_.pose.orientation.x = m->q1;
+  pose_msg_.pose.orientation.y = m->q2;
+  pose_msg_.pose.orientation.z = m->q3;
+  pose_pub_.publish(pose_msg_);
 
-void GuidanceManager::velocity_handler(int data_len, char *content) {}
+  twist_global_msg_.header.frame_id = "local_origin";
+  twist_global_msg_.header.stamp = now;
+  twist_global_msg_.twist.linear.x = m->velocity_in_global_x;
+  twist_global_msg_.twist.linear.y = m->velocity_in_global_y;
+  twist_global_msg_.twist.linear.z = m->velocity_in_global_z;
+  velocity_global_pub_.publish(twist_global_msg_);
+}
+
+void GuidanceManager::velocity_handler(int data_len, char *content) {
+  velocity *vo = (velocity*)content;
+  twist_body_msg_.header.frame_id = "guidance";
+  twist_body_msg_.header.stamp = ros::Time::now();
+  twist_body_msg_.twist.linear.x = 0.001f * vo->vx;
+  twist_body_msg_.twist.linear.y = 0.001f * vo->vy;
+  twist_body_msg_.twist.linear.z = 0.001f * vo->vz;
+  velocity_body_pub_.publish(twist_body_msg_);
+}
 
 void GuidanceManager::obstacle_handler(int data_len, char *content) {}
 
