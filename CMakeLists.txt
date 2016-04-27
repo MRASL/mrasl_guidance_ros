@@ -20,6 +20,9 @@ find_package(catkin REQUIRED COMPONENTS
   image_transport
   geometry_msgs
   dynamic_reconfigure
+  camera_info_manager
+  tf2
+  tf2_ros
 )
 
 find_package(OpenCV REQUIRED)
@@ -37,6 +40,9 @@ catkin_package(
                   image_transport
                   geometry_msgs
                   dynamic_reconfigure
+                  camera_info_manager
+                  tf2
+                  tf2_ros
 )
 
 include_directories(

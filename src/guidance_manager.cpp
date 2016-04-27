@@ -9,9 +9,9 @@
 #include <stereo_msgs/DisparityImage.h>
 #include <sensor_msgs/Imu.h>
 #include <sensor_msgs/LaserScan.h>
+#include <sensor_msgs/Range.h>
 #include <geometry_msgs/Vector3Stamped.h>
 #include <geometry_msgs/TwistStamped.h>
-#include <geometry_msgs/TwistWithCovarianceStamped.h>
 
 #include <dji/guidance.h>
 #include "guidance_manager.hpp"
@@ -50,37 +50,70 @@ e_sdk_err_code GuidanceManager::init(ros::NodeHandle pnh) {
   // Init message buffers
   image_left_.image.create(IMG_HEIGHT, IMG_WIDTH, CV_8UC1);
   image_right_.image.create(IMG_HEIGHT, IMG_WIDTH, CV_8UC1);
-  image_depth_.image.create(IMG_HEIGHT, IMG_WIDTH, CV_16SC1);
+  image_depth_.image.create(IMG_HEIGHT, IMG_WIDTH, CV_32FC1);
+  mat_depth16_.create(IMG_HEIGHT, IMG_WIDTH, CV_16SC1);
   image_cv_disparity_.image.create(IMG_HEIGHT, IMG_WIDTH, CV_16SC1);
   // Invalidate angular velocity since it's not provided, mark the covariances
   // as unknown
-  imu_msg_.angular_velocity.x = imu_msg_.angular_velocity.y =
+  imu_msg_.angular_velocity.x =
+      imu_msg_.angular_velocity.y =
       imu_msg_.angular_velocity.z = 0;
   imu_msg_.angular_velocity_covariance = {-1};
   imu_msg_.linear_acceleration_covariance =
       imu_msg_.orientation_covariance = {0};
   //Set angular twist to 0
-  twist_body_msg_.twist.angular.x = twist_body_msg_.twist.angular.y = twist_body_msg_.twist.angular.z = 0;
-  twist_global_msg_.twist.angular.x = twist_global_msg_.twist.angular.y = twist_global_msg_.twist.angular.z = 0;
+  twist_body_msg_.twist.angular.x =
+      twist_body_msg_.twist.angular.y =
+      twist_body_msg_.twist.angular.z = 0;
+  twist_global_msg_.twist.angular.x =
+      twist_global_msg_.twist.angular.y =
+      twist_global_msg_.twist.angular.z = 0;
+  // Set ultrasonic properties
+  ultrasonic_msg_.radiation_type  = sensor_msgs::Range::ULTRASOUND;
+  ultrasonic_msg_.field_of_view   = 0.785398; // TODO defaulted to 45 degrees in radians; need real value
+  ultrasonic_msg_.min_range       = 0.1;
+  ultrasonic_msg_.max_range       = 8.0;
 
-  // init image publishers
+
+  // init multi-publishers
   for (int i = 0; i < CAMERA_PAIR_NUM; ++i) {
-    depth_image_pub_[i] =
-        it_->advertise("cam" + std::to_string(i) + "/depth", 1);
-    left_image_pub_[i] = it_->advertise("cam" + std::to_string(i) + "/left", 1);
-    right_image_pub_[i] =
-        it_->advertise("cam" + std::to_string(i) + "/right", 1);
+    //depth_image_pub_[i] = it_->advertise("cam" + std::to_string(i) + "/depth", 1);
+    //left_image_pub_[i]  = it_->advertise("cam" + std::to_string(i) + "/left", 1);
+    //right_image_pub_[i] = it_->advertise("cam" + std::to_string(i) + "/right", 1);
+    // init camera parameters
+    depth_cam_info_man[i] = new camera_info_manager::CameraInfoManager(
+          pnh_,
+          "guidance/cam1/left/image_raw",
+          "/home/andre/Documents/mrasl/dji_challenge/catkin_ws/src/mrasl_guidance_ros/calibration_files/camera_params_left.ini");
+        depth_cam_info_man[i]->loadCameraInfo("file:///home/andre/Documents/mrasl/dji_challenge/catkin_ws/src/mrasl_guidance_ros/calibration_files/camera_params_left.ini");
+        depth_image_pub_[i] = new image_transport::CameraPublisher(it_->advertiseCamera("cam" + std::to_string(i) + "/depth/image_raw", 1));
+
+    right_cam_info_man[i] = new camera_info_manager::CameraInfoManager(
+  			pnh_,
+  			"guidance/cam1/right/image_raw",
+  			"/home/andre/Documents/mrasl/dji_challenge/catkin_ws/src/mrasl_guidance_ros/calibration_files/camera_params_right.ini");
+  		right_cam_info_man[i]->loadCameraInfo("file:///home/andre/Documents/mrasl/dji_challenge/catkin_ws/src/mrasl_guidance_ros/calibration_files/camera_params_right.ini");
+  		right_image_pub_[i] = new image_transport::CameraPublisher(it_->advertiseCamera("cam" + std::to_string(i) + "/right/image_raw", 1));
+
+      left_cam_info_man[i] = new camera_info_manager::CameraInfoManager(
+      			pnh_,
+      			"guidance/cam1/left/image_raw",
+      			"/home/andre/Documents/mrasl/dji_challenge/catkin_ws/src/mrasl_guidance_ros/calibration_files/camera_params_left.ini");
+      		left_cam_info_man[i]->loadCameraInfo("file:///home/andre/Documents/mrasl/dji_challenge/catkin_ws/src/mrasl_guidance_ros/calibration_files/camera_params_left.ini");
+      		left_image_pub_[i] = new image_transport::CameraPublisher(it_->advertiseCamera("cam" + std::to_string(i) + "/left/image_raw", 1));
+
     disparity_image_pub_[i] = pnh_.advertise<stereo_msgs::DisparityImage>(
         "cam" + std::to_string(i) + "/disparity", 1);
+    ultrasonic_pub_[i] = pnh_.advertise<sensor_msgs::Range>("sonar" + std::to_string(i), 10);
   }
 
   imu_pub_ = pnh_.advertise<sensor_msgs::Imu>("imu", 10);
   obstacle_distance_pub_ =
       pnh_.advertise<sensor_msgs::LaserScan>("obstacle_distance", 10);
-  velocity_body_pub_ = pnh_.advertise<geometry_msgs::TwistStamped>("~/body/velocity", 10);
-  velocity_global_pub_ = pnh_.advertise<geometry_msgs::TwistWithCovarianceStamped>("~/global/velocity", 10);
-  ultrasonic_pub_ = pnh_.advertise<sensor_msgs::LaserScan>("sonar", 10);
-  pose_pub_ = pnh_.advertise<geometry_msgs::PoseStamped>("pose", 10);
+  velocity_body_pub_ = pnh_.advertise<geometry_msgs::TwistStamped>("body/velocity", 10);
+  velocity_global_pub_ = pnh_.advertise<geometry_msgs::TwistStamped>("global/velocity", 10);
+  pose_pub_ = pnh_.advertise<geometry_msgs::PoseStamped>("global/pose", 10);
+
 
   // Start configuring the Guidance
   e_sdk_err_code err_code = static_cast<e_sdk_err_code>(reset_config());
@@ -152,7 +185,12 @@ void GuidanceManager::image_handler(int data_len, char *content) {
       image_left_.header.frame_id = "cam" + std::to_string(i) + "_left";
       image_left_.header.stamp = ros::Time::now();
       image_left_.encoding = sensor_msgs::image_encodings::MONO8;
-      left_image_pub_[i].publish(image_left_.toImageMsg());
+
+      sensor_msgs::CameraInfoPtr ci_left(new sensor_msgs::CameraInfo(left_cam_info_man[i]->getCameraInfo()));
+			ci_left->header.stamp = image_left_.header.stamp;
+			ci_left->header.frame_id  = "cam" + std::to_string(i) + "_left";
+
+      left_image_pub_[i]->publish(image_left_.toImageMsg(), ci_left);
     }
     if (data->m_greyscale_image_right[i] != NULL) {
       memcpy(image_right_.image.data, data->m_greyscale_image_right[i],
@@ -160,24 +198,37 @@ void GuidanceManager::image_handler(int data_len, char *content) {
       image_right_.header.frame_id = "cam" + std::to_string(i) + "_right";
       image_right_.header.stamp = ros::Time::now();
       image_right_.encoding = sensor_msgs::image_encodings::MONO8;
-      right_image_pub_[i].publish(image_right_.toImageMsg());
+
+      sensor_msgs::CameraInfoPtr ci_right(new sensor_msgs::CameraInfo(right_cam_info_man[i]->getCameraInfo()));
+			ci_right->header.stamp = image_right_.header.stamp;
+			ci_right->header.frame_id  = image_right_.header.frame_id;
+      right_image_pub_[i]->publish(image_right_.toImageMsg(), ci_right);
       // break;
     }
     if (data->m_depth_image[i] != NULL) {
       // 16 bit signed images, omitting processing here
-      memcpy(image_depth_.image.data, data->m_depth_image[i], IMG_SIZE * 2);
-/*
+      memcpy(mat_depth16_.data, data->m_depth_image[i], IMG_SIZE * 2);
+
+      cv::filterSpeckles(mat_depth16_, -16, maxSpeckleSize_, maxSpeckleDiff_);
+      mat_depth16_.convertTo(mat_depth16_, CV_32FC1);
+      cv::medianBlur(mat_depth16_, mat_depth16_, 3);
+      image_depth_.image = mat_depth16_ / 128.0;
+      image_depth_.header.frame_id = "cam" + std::to_string(i) + "_left";
+      image_depth_.header.stamp = ros::Time::now();
+      image_depth_.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
+
       //test code
-      cv::filterSpeckles(image_depth_.image, 0, 100, 128);
       image_depth_.image.convertTo(depth8, CV_8UC1);
       cv::imshow("test", depth8);
       cv::waitKey(1);
-      //end test code*/
+      //end test code
 
-      image_depth_.header.frame_id = "cam" + std::to_string(i) + "_left";
-      image_depth_.header.stamp = ros::Time::now();
-      image_depth_.encoding = sensor_msgs::image_encodings::MONO16;
-      depth_image_pub_[i].publish(image_depth_.toImageMsg());
+      sensor_msgs::CameraInfoPtr ci_depth(new sensor_msgs::CameraInfo(depth_cam_info_man[i]->getCameraInfo()));
+      ci_depth->header.stamp = image_depth_.header.stamp;
+      ci_depth->header.frame_id  = image_depth_.header.frame_id;
+
+      depth_image_pub_[i]->publish(image_depth_.toImageMsg(), ci_depth);
+      mat_depth16_.convertTo(mat_depth16_, CV_16SC1);
       // break;
     }
     if (data->m_disparity_image[i] != NULL) {
@@ -209,7 +260,10 @@ void GuidanceManager::imu_handler(int data_len, char *content) {
 
 void GuidanceManager::ultrasonic_handler(int data_len, char *content) {
   ultrasonic_data *ultrasonic = (ultrasonic_data *)content;
+  ultrasonic_msg_.header.stamp = ros::Time::now();
   for (int i = 0; i < CAMERA_PAIR_NUM; ++i) {
+    ultrasonic_msg_.header.frame_id = "sonar" + std::to_string(i);
+    ultrasonic_msg_.range = 0.001f * ultrasonic->ultrasonic[i];
   }
 }
 
@@ -233,6 +287,22 @@ void GuidanceManager::motion_handler(int data_len, char *content) {
   twist_global_msg_.twist.linear.y = m->velocity_in_global_y;
   twist_global_msg_.twist.linear.z = m->velocity_in_global_z;
   velocity_global_pub_.publish(twist_global_msg_);
+/*
+  static tf2_ros::TransformBroadcaster br;
+  geometry_msgs::TransformStamped transformStamped;
+
+  transformStamped.header.stamp = ros::Time::now();
+  transformStamped.header.frame_id = "world";
+  transformStamped.child_frame_id = "guidance";
+  transformStamped.transform.translation.x = m->position_in_global_x;
+  transformStamped.transform.translation.y = m->position_in_global_y;
+  transformStamped.transform.translation.z = m->position_in_global_z;
+  transformStamped.transform.rotation.x = m->q1;
+  transformStamped.transform.rotation.y = m->q2;
+  transformStamped.transform.rotation.z = m->q3;
+  transformStamped.transform.rotation.w = m->q0;
+
+  br.sendTransform(transformStamped);*/
 }
 
 void GuidanceManager::velocity_handler(int data_len, char *content) {

@@ -1,6 +1,17 @@
 <launch>
   <node pkg="guidance" type="guidance" name="guidance" output="screen">
-
   </node>
+  <node pkg="nodelet" type="nodelet" args="manager" name="depth_transforms_manager" 
+    output="screen" />
+
+  <node pkg="nodelet" type="nodelet" name="cloudify"
+    args="load depth_image_proc/point_cloud_xyz depth_transforms_manager --no-bond" >
+    <remap from="camera_info" to="guidance/cam1/depth/camera_info" />
+    <remap from="image_rect" to="guidance/cam1/depth/image_raw" />
+    <remap from="points" to="points_guidance" />
+  </node>
+
+  <node pkg="tf" type="static_transform_publisher" name="link1_broadcaster"
+    args="0 0 1.15 3.14159 3.14159 1.5708 world cam1_left 100" />
 
 </launch>

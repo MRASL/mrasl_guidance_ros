@@ -4,11 +4,17 @@
 
 #include <ros/ros.h>
 #include <image_transport/image_transport.h>
+#include <camera_info_manager/camera_info_manager.h>
 #include <cv_bridge/cv_bridge.h>
 #include <stereo_msgs/DisparityImage.h>
+#include <sensor_msgs/LaserScan.h>
+#include <sensor_msgs/Range.h>
 #include <sensor_msgs/Imu.h>
 #include <geometry_msgs/TwistStamped.h>
 #include <geometry_msgs/PoseStamped.h>
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2_ros/transform_broadcaster.h>
+#include <geometry_msgs/TransformStamped.h>
 
 #include <dji/guidance.h>
 #include <opencv2/opencv.hpp>
@@ -19,6 +25,8 @@
  * be static.
  * Because of this, might as well follow a singleton pattern and hopefully
  * everything works out.
+ *
+ * RIP my computer engineering degree
  */
 class GuidanceManager {
  public:
@@ -56,6 +64,10 @@ class GuidanceManager {
   void velocity_handler(int data_len, char *content);
   void obstacle_handler(int data_len, char *content);
 
+  // parameters
+  void set_maxSpeckleSize(int maxSpeckleSize) {maxSpeckleSize_ = maxSpeckleSize;};
+  void set_maxDiff(double maxDiff) {maxSpeckleDiff_ = maxDiff; };
+
  private:
   ros::NodeHandle pnh_;
   static GuidanceManager *s_instance_;
@@ -68,13 +80,24 @@ class GuidanceManager {
 #define IMG_SIZE 76800
 #define CAMERA_PAIR_NUM 5
 
+  // Camera stuff
+  stereo_cali calibration_params[5];
+  camera_info_manager::CameraInfoManager *right_cam_info_man[CAMERA_PAIR_NUM];
+  camera_info_manager::CameraInfoManager *left_cam_info_man[CAMERA_PAIR_NUM];
+  camera_info_manager::CameraInfoManager *depth_cam_info_man[CAMERA_PAIR_NUM];
+
+  // image processing stuff
+  int maxSpeckleSize_;
+  double maxSpeckleDiff_;
+
   // Message buffers
   cv_bridge::CvImage image_left_;
   cv_bridge::CvImage image_right_;
   cv_bridge::CvImage image_depth_;
+  cv::Mat mat_depth16_;
   cv_bridge::CvImage image_cv_disparity_;
   stereo_msgs::DisparityImage image_disparity_;
-  stereo_cali calibration_params[5];
+  sensor_msgs::Range ultrasonic_msg_;
   sensor_msgs::Imu imu_msg_;
   geometry_msgs::TwistStamped twist_body_msg_;
   geometry_msgs::TwistStamped twist_global_msg_;
@@ -89,15 +112,15 @@ class GuidanceManager {
 
   // publishers
   image_transport::ImageTransport *it_;
-  image_transport::Publisher depth_image_pub_[CAMERA_PAIR_NUM];
-  image_transport::Publisher left_image_pub_[CAMERA_PAIR_NUM];
-  image_transport::Publisher right_image_pub_[CAMERA_PAIR_NUM];
+  image_transport::CameraPublisher* depth_image_pub_[CAMERA_PAIR_NUM];
+  image_transport::CameraPublisher* left_image_pub_[CAMERA_PAIR_NUM];
+  image_transport::CameraPublisher* right_image_pub_[CAMERA_PAIR_NUM];
   ros::Publisher disparity_image_pub_[CAMERA_PAIR_NUM];
   ros::Publisher imu_pub_;
   ros::Publisher obstacle_distance_pub_;
   ros::Publisher velocity_body_pub_;
   ros::Publisher velocity_global_pub_;
-  ros::Publisher ultrasonic_pub_;
+  ros::Publisher ultrasonic_pub_[CAMERA_PAIR_NUM];
   ros::Publisher pose_pub_;
 };
 
