@@ -23,12 +23,18 @@ find_package(catkin REQUIRED COMPONENTS
   camera_info_manager
   tf2
   tf2_ros
+  message_generation
 )
 
 find_package(OpenCV REQUIRED)
 
 generate_dynamic_reconfigure_options(
   cfg/guidance.cfg
+)
+
+add_service_files(
+  FILES
+  toggle_camera.srv
 )
 
 catkin_package(
@@ -43,6 +49,7 @@ catkin_package(
                   camera_info_manager
                   tf2
                   tf2_ros
+                  message_generation
 )
 
 include_directories(
@@ -80,6 +87,7 @@ add_executable( guidance
 
 add_dependencies(guidance
   ${PROJECT_NAME}_gencfg
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
 )
 
 target_link_libraries( guidance

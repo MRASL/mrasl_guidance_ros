@@ -65,8 +65,10 @@ class GuidanceManager {
   void obstacle_handler(int data_len, char *content);
 
   // parameters
-  void set_maxSpeckleSize(int maxSpeckleSize) {maxSpeckleSize_ = maxSpeckleSize;};
-  void set_maxDiff(double maxDiff) {maxSpeckleDiff_ = maxDiff; };
+  void set_maxSpeckleSize(int maxSpeckleSize) {
+    maxSpeckleSize_ = maxSpeckleSize;
+  };
+  void set_maxDiff(double maxDiff) { maxSpeckleDiff_ = maxDiff; };
 
  private:
   ros::NodeHandle pnh_;
@@ -85,6 +87,26 @@ class GuidanceManager {
   camera_info_manager::CameraInfoManager *right_cam_info_man[CAMERA_PAIR_NUM];
   camera_info_manager::CameraInfoManager *left_cam_info_man[CAMERA_PAIR_NUM];
   camera_info_manager::CameraInfoManager *depth_cam_info_man[CAMERA_PAIR_NUM];
+
+  /**
+   * Creates a depth image Publisher
+   * @param nh            The parent nodehandle of the depth image Publisher
+   * @param index         Camera index of the Guidance
+   * @param cam_info_path Path to the camera info file
+   */
+  void createDepthPublisher(ros::NodeHandle nh, unsigned int index,
+                            std::string cam_info_path);
+
+  /**
+   * Creates an image Publisher
+   * @param nh            The parent nodehandle of the image Publisher
+   * @param index         Camera index of the guidance
+   * @param cam_info_path Path to the camera info file
+   * @param is_left       Boolean, if true, this is the left cam, else, right
+   * cam
+   */
+  void createImagePublisher(ros::NodeHandle nh, unsigned int index,
+                            std::string cam_info_path, bool is_left);
 
   // image processing stuff
   int maxSpeckleSize_;
@@ -112,9 +134,9 @@ class GuidanceManager {
 
   // publishers
   image_transport::ImageTransport *it_;
-  image_transport::CameraPublisher* depth_image_pub_[CAMERA_PAIR_NUM];
-  image_transport::CameraPublisher* left_image_pub_[CAMERA_PAIR_NUM];
-  image_transport::CameraPublisher* right_image_pub_[CAMERA_PAIR_NUM];
+  image_transport::CameraPublisher *depth_image_pub_[CAMERA_PAIR_NUM];
+  image_transport::CameraPublisher *left_image_pub_[CAMERA_PAIR_NUM];
+  image_transport::CameraPublisher *right_image_pub_[CAMERA_PAIR_NUM];
   ros::Publisher disparity_image_pub_[CAMERA_PAIR_NUM];
   ros::Publisher imu_pub_;
   ros::Publisher obstacle_distance_pub_;
