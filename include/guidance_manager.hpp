@@ -17,6 +17,7 @@
 #include <geometry_msgs/TransformStamped.h>
 
 #include <dji/guidance.h>
+#include "guidance_configuration.hpp"
 #include <opencv2/opencv.hpp>
 
 /**
@@ -107,6 +108,11 @@ class GuidanceManager {
    */
   void createImagePublisher(ros::NodeHandle nh, unsigned int index,
                             std::string cam_info_path, bool is_left);
+
+  /**
+   * Apply a configuration to the Guidance
+   */
+  e_sdk_err_code configureGuidance(void);
 
   // image processing stuff
   int maxSpeckleSize_;

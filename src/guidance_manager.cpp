@@ -15,6 +15,7 @@
 
 #include <dji/guidance.h>
 #include "guidance_manager.hpp"
+#include "guidance_configuration.hpp"
 
 namespace {
 volatile std::sig_atomic_t gSignalStatus;
@@ -183,8 +184,10 @@ void GuidanceManager::createDepthPublisher(ros::NodeHandle nh,
       new image_transport::CameraPublisher(it_->advertiseCamera(cam_topic, 1));
 }
 
-void GuidanceManager::createImagePublisher(ros::NodeHandle nh, unsigned int index,
-                          std::string cam_info_path, bool is_left) {
+void GuidanceManager::createImagePublisher(ros::NodeHandle nh,
+                                           unsigned int index,
+                                           std::string cam_info_path,
+                                           bool is_left) {
   std::string idx = std::to_string(index);
   std::string cam_topic = is_left ? "cam" + idx + "/left/image_raw"
                                   : "cam" + idx + "/right/image_raw";
@@ -206,6 +209,14 @@ void GuidanceManager::createImagePublisher(ros::NodeHandle nh, unsigned int inde
     right_image_pub_[index] = new image_transport::CameraPublisher(
         it_->advertiseCamera(cam_topic, 1));
   }
+}
+
+e_sdk_err_code GuidanceManager::configureGuidance(void) {
+  stop_transfer();
+  reset_config();
+
+  e_sdk_err_code err_code = static_cast<e_sdk_err_code>(start_transfer());
+  RETURN_IF_ERR(err_code);
 }
 
 cv::Mat depth8(IMG_HEIGHT, IMG_WIDTH, CV_8UC1);
