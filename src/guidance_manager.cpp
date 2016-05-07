@@ -1,3 +1,4 @@
+#include <iostream>
 #include <csignal>
 #include <string>
 #include <mutex>
@@ -67,11 +68,10 @@ e_sdk_err_code GuidanceManager::init(ros::NodeHandle pnh) {
   twist_global_msg_.twist.angular.x = twist_global_msg_.twist.angular.y =
       twist_global_msg_.twist.angular.z = 0;
   // Set ultrasonic properties
-  ultrasonic_msg_.radiation_type = sensor_msgs::Range::ULTRASOUND;
-  ultrasonic_msg_.field_of_view =
-      0.785398;  // TODO defaulted to 45 degrees in radians; need real value
-  ultrasonic_msg_.min_range = 0.1;
-  ultrasonic_msg_.max_range = 8.0;
+  ultrasonic_msg_.radiation_type  = sensor_msgs::Range::ULTRASOUND;
+  ultrasonic_msg_.field_of_view   = 0.785398; // TODO defaulted to 45 degrees in radians; need real value
+  ultrasonic_msg_.min_range       = 0.1;
+  ultrasonic_msg_.max_range       = 8.0;
 
   // init multi-publishers
   for (int i = 0; i < CAMERA_PAIR_NUM; ++i) {
@@ -248,6 +248,7 @@ void GuidanceManager::image_handler(int data_len, char *content) {
       ci_left->header.frame_id = "cam" + std::to_string(i) + "_left";
 
       left_image_pub_[i]->publish(image_left_.toImageMsg(), ci_left);
+      //std::cout << "left " << data->frame_index << '\t' << data->time_stamp << std::endl;
     }
     if (data->m_greyscale_image_right[i] != NULL) {
       memcpy(image_right_.image.data, data->m_greyscale_image_right[i],
@@ -276,6 +277,7 @@ void GuidanceManager::image_handler(int data_len, char *content) {
 
       sensor_msgs::CameraInfoPtr ci_depth(
           new sensor_msgs::CameraInfo(depth_cam_info_man[i]->getCameraInfo()));
+
       ci_depth->header.stamp = image_depth_.header.stamp;
       ci_depth->header.frame_id = image_depth_.header.frame_id;
 
