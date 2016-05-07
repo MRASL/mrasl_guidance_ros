@@ -70,6 +70,9 @@ class GuidanceManager {
 
  private:
   ros::NodeHandle pnh_;
+  ros::NodeHandle depth_pnh_;
+  ros::NodeHandle left_pnh_;
+  ros::NodeHandle right_pnh_;
   static GuidanceManager *s_instance_;
   GuidanceManager() {}  // Purposely hide the damn things
   GuidanceManager(GuidanceManager const &);

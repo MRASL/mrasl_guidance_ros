@@ -1,3 +1,4 @@
+#include <iostream>
 #include <csignal>
 #include <string>
 #include <mutex>
@@ -74,38 +75,41 @@ e_sdk_err_code GuidanceManager::init(ros::NodeHandle pnh) {
   ultrasonic_msg_.min_range       = 0.1;
   ultrasonic_msg_.max_range       = 8.0;
 
-
+int i = 1;
   // init multi-publishers
-  for (int i = 0; i < CAMERA_PAIR_NUM; ++i) {
+  //for (int i = 0; i < CAMERA_PAIR_NUM; ++i) {
     //depth_image_pub_[i] = it_->advertise("cam" + std::to_string(i) + "/depth", 1);
     //left_image_pub_[i]  = it_->advertise("cam" + std::to_string(i) + "/left", 1);
     //right_image_pub_[i] = it_->advertise("cam" + std::to_string(i) + "/right", 1);
     // init camera parameters
+    depth_pnh_ = ros::NodeHandle(pnh_, "cam1/depth");
+    right_pnh_ = ros::NodeHandle(pnh_, "cam1/right");
+    left_pnh_ = ros::NodeHandle(pnh_, "cam1/left");
     depth_cam_info_man[i] = new camera_info_manager::CameraInfoManager(
-          pnh_,
+          depth_pnh_,
           "guidance/cam1/left/image_raw",
-          "/home/andre/Documents/mrasl/dji_challenge/catkin_ws/src/mrasl_guidance_ros/calibration_files/camera_params_left.ini");
-        depth_cam_info_man[i]->loadCameraInfo("file:///home/andre/Documents/mrasl/dji_challenge/catkin_ws/src/mrasl_guidance_ros/calibration_files/camera_params_left.ini");
+          "/home/ubuntu/Documents/andre/dji_ws/src/mrasl_guidance_ros/calibration_files/camera_params_left.ini");
+        depth_cam_info_man[i]->loadCameraInfo("file:///home/ubuntu/Documents/andre/dji_ws/src/mrasl_guidance_ros/calibration_files/camera_params_left.ini");
         depth_image_pub_[i] = new image_transport::CameraPublisher(it_->advertiseCamera("cam" + std::to_string(i) + "/depth/image_raw", 1));
 
     right_cam_info_man[i] = new camera_info_manager::CameraInfoManager(
-  			pnh_,
+  			right_pnh_,
   			"guidance/cam1/right/image_raw",
-  			"/home/andre/Documents/mrasl/dji_challenge/catkin_ws/src/mrasl_guidance_ros/calibration_files/camera_params_right.ini");
-  		right_cam_info_man[i]->loadCameraInfo("file:///home/andre/Documents/mrasl/dji_challenge/catkin_ws/src/mrasl_guidance_ros/calibration_files/camera_params_right.ini");
+  			"/home/ubuntu/Documents/andre/dji_ws/src/mrasl_guidance_ros/calibration_files/camera_params_right.ini");
+  		right_cam_info_man[i]->loadCameraInfo("file:///home/ubuntu/Documents/andre/dji_ws/src/mrasl_guidance_ros/calibration_files/camera_params_right.ini");
   		right_image_pub_[i] = new image_transport::CameraPublisher(it_->advertiseCamera("cam" + std::to_string(i) + "/right/image_raw", 1));
 
       left_cam_info_man[i] = new camera_info_manager::CameraInfoManager(
-      			pnh_,
+      			left_pnh_,
       			"guidance/cam1/left/image_raw",
-      			"/home/andre/Documents/mrasl/dji_challenge/catkin_ws/src/mrasl_guidance_ros/calibration_files/camera_params_left.ini");
-      		left_cam_info_man[i]->loadCameraInfo("file:///home/andre/Documents/mrasl/dji_challenge/catkin_ws/src/mrasl_guidance_ros/calibration_files/camera_params_left.ini");
+      			"/home/ubuntu/Documents/andre/dji_ws/src/mrasl_guidance_ros/calibration_files/camera_params_left.ini");
+      		left_cam_info_man[i]->loadCameraInfo("file:///home/ubuntu/Documents/andre/dji_ws/src/mrasl_guidance_ros/calibration_files/camera_params_left.ini");
       		left_image_pub_[i] = new image_transport::CameraPublisher(it_->advertiseCamera("cam" + std::to_string(i) + "/left/image_raw", 1));
 
     disparity_image_pub_[i] = pnh_.advertise<stereo_msgs::DisparityImage>(
         "cam" + std::to_string(i) + "/disparity", 1);
     ultrasonic_pub_[i] = pnh_.advertise<sensor_msgs::Range>("sonar" + std::to_string(i), 10);
-  }
+  //}
 
   imu_pub_ = pnh_.advertise<sensor_msgs::Imu>("imu", 10);
   obstacle_distance_pub_ =
@@ -191,6 +195,7 @@ void GuidanceManager::image_handler(int data_len, char *content) {
 			ci_left->header.frame_id  = "cam" + std::to_string(i) + "_left";
 
       left_image_pub_[i]->publish(image_left_.toImageMsg(), ci_left);
+      //std::cout << "left " << data->frame_index << '\t' << data->time_stamp << std::endl;
     }
     if (data->m_greyscale_image_right[i] != NULL) {
       memcpy(image_right_.image.data, data->m_greyscale_image_right[i],
@@ -202,8 +207,8 @@ void GuidanceManager::image_handler(int data_len, char *content) {
       sensor_msgs::CameraInfoPtr ci_right(new sensor_msgs::CameraInfo(right_cam_info_man[i]->getCameraInfo()));
 			ci_right->header.stamp = image_right_.header.stamp;
 			ci_right->header.frame_id  = image_right_.header.frame_id;
-      right_image_pub_[i]->publish(image_right_.toImageMsg(), ci_right);
-      // break;
+      right_image_pub_[i]->publish(image_right_.toImageMsg(), ci_right);      
+      //std::cout << "right " << data->frame_index << '\t' << data->time_stamp << std::endl;
     }
     if (data->m_depth_image[i] != NULL) {
       // 16 bit signed images, omitting processing here
@@ -218,9 +223,10 @@ void GuidanceManager::image_handler(int data_len, char *content) {
       image_depth_.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
 
       //test code
+      /*
       image_depth_.image.convertTo(depth8, CV_8UC1);
       cv::imshow("test", depth8);
-      cv::waitKey(1);
+      cv::waitKey(1); */
       //end test code
 
       sensor_msgs::CameraInfoPtr ci_depth(new sensor_msgs::CameraInfo(depth_cam_info_man[i]->getCameraInfo()));
