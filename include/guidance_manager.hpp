@@ -1,6 +1,6 @@
 #ifndef GUIDANCE_MANAGER_HPP
 #define GUIDANCE_MANAGER_HPP
-#include <vector>
+#include <map>
 
 #include <ros/ros.h>
 #include <image_transport/image_transport.h>
@@ -64,6 +64,11 @@ class GuidanceManager {
   void motion_handler(int data_len, char *content);
   void velocity_handler(int data_len, char *content);
   void obstacle_handler(int data_len, char *content);
+  
+  /**
+   *  Pop off old time stamps that we don't need
+   */
+  void cleanTimestampBuf();
 
   // parameters
   void set_maxSpeckleSize(int maxSpeckleSize) {
@@ -150,6 +155,15 @@ class GuidanceManager {
   ros::Publisher velocity_global_pub_;
   ros::Publisher ultrasonic_pub_[CAMERA_PAIR_NUM];
   ros::Publisher pose_pub_;
+  
+  typedef struct TimeStamp_ {
+		unsigned int frame_index;
+		unsigned int time_stamp;
+		ros::Time rostime;
+	} TimeStamp;
+	
+	std::map<unsigned int, TimeStamp> timestamp_buf_;
+
 };
 
 #endif  // GUIDANCE_MANAGER_HPP

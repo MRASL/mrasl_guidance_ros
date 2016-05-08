@@ -223,11 +223,23 @@ cv::Mat depth8(IMG_HEIGHT, IMG_WIDTH, CV_8UC1);
 void GuidanceManager::image_handler(int data_len, char *content) {
   // Figure out what kind of image this is and which camera it came from
   image_data *data = (image_data *)content;
+  
+  //time stamping
+  if (timestamp_buf_.count(data->frame_index) < 1) {
+		// didn't get this frame index yet
+		TimeStamp t;
+		t.frame_index = data->frame_index;
+		t.time_stamp = data->time_stamp;
+		t.rostime = ros::Time::now();
+		timestamp_buf_[data->frame_index] = t;
+	}
+  ros::Time time = timestamp_buf_[data->frame_index].rostime;
+  
   for (int i = 0; i < CAMERA_PAIR_NUM; ++i) {
     if (data->m_greyscale_image_left[i] != NULL) {
       memcpy(image_left_.image.data, data->m_greyscale_image_left[i], IMG_SIZE);
       image_left_.header.frame_id = "cam" + std::to_string(i) + "_left";
-      image_left_.header.stamp = ros::Time::now();
+      image_left_.header.stamp = time;
       image_left_.encoding = sensor_msgs::image_encodings::MONO8;
 
       sensor_msgs::CameraInfoPtr ci_left(
@@ -241,7 +253,7 @@ void GuidanceManager::image_handler(int data_len, char *content) {
       memcpy(image_right_.image.data, data->m_greyscale_image_right[i],
              IMG_SIZE);
       image_right_.header.frame_id = "cam" + std::to_string(i) + "_right";
-      image_right_.header.stamp = ros::Time::now();
+      image_right_.header.stamp = time;
       image_right_.encoding = sensor_msgs::image_encodings::MONO8;
 
       sensor_msgs::CameraInfoPtr ci_right(
@@ -249,7 +261,6 @@ void GuidanceManager::image_handler(int data_len, char *content) {
       ci_right->header.stamp = image_right_.header.stamp;
       ci_right->header.frame_id = image_right_.header.frame_id;
       right_image_pub_[i]->publish(image_right_.toImageMsg(), ci_right);
-      // break;
     }
     if (data->m_depth_image[i] != NULL) {
       // 16 bit signed images, omitting processing here
@@ -260,14 +271,8 @@ void GuidanceManager::image_handler(int data_len, char *content) {
       cv::medianBlur(mat_depth16_, mat_depth16_, 3);
       image_depth_.image = mat_depth16_ / 128.0;
       image_depth_.header.frame_id = "cam" + std::to_string(i) + "_left";
-      image_depth_.header.stamp = ros::Time::now();
+      image_depth_.header.stamp = time;
       image_depth_.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
-
-      // test code
-      image_depth_.image.convertTo(depth8, CV_8UC1);
-      cv::imshow("test", depth8);
-      cv::waitKey(1);
-      // end test code
 
       sensor_msgs::CameraInfoPtr ci_depth(
           new sensor_msgs::CameraInfo(depth_cam_info_man[i]->getCameraInfo()));
@@ -276,17 +281,15 @@ void GuidanceManager::image_handler(int data_len, char *content) {
 
       depth_image_pub_[i]->publish(image_depth_.toImageMsg(), ci_depth);
       mat_depth16_.convertTo(mat_depth16_, CV_16SC1);
-      // break;
     }
     if (data->m_disparity_image[i] != NULL) {
       memcpy(image_cv_disparity_.image.data, data->m_disparity_image[i],
              IMG_SIZE * 2);
       image_disparity_.image = *image_cv_disparity_.toImageMsg();
       image_disparity_.header.frame_id = "cam" + std::to_string(i) + "_left";
-      image_disparity_.header.stamp = ros::Time::now();
+      image_disparity_.header.stamp = time;
       image_disparity_.f = calibration_params[i].focal;
       image_disparity_.T = calibration_params[i].baseline;
-      // break;
     }
   }
 }
@@ -364,6 +367,11 @@ void GuidanceManager::velocity_handler(int data_len, char *content) {
 
 void GuidanceManager::obstacle_handler(int data_len, char *content) {}
 
+void GuidanceManager::cleanTimestampBuf() {
+	if(timestamp_buf_.size() > 5)
+	  timestamp_buf_.erase(timestamp_buf_.begin());
+}
+
 int guidance_data_rcvd_cb(int event, int data_len, char *content) {
   std::lock_guard<std::mutex> guard(g_guidance_mutex);
   if (content == NULL) return 1;
@@ -390,4 +398,6 @@ int guidance_data_rcvd_cb(int event, int data_len, char *content) {
     default:
       break;
   }
+  
+  GuidanceManager::getInstance()->cleanTimestampBuf();
 }
