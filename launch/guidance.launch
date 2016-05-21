@@ -1,5 +1,6 @@
 <launch>
   <node pkg="mrasl_guidance" type="guidance" name="guidance" output="screen">
+    <rosparam command="load" file="$(find mrasl_guidance)/launch/config.yaml" />
   </node>
   
   <node pkg="tf" type="static_transform_publisher" name="link1_broadcaster"
