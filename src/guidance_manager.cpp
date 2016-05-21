@@ -1,3 +1,4 @@
+#include <iostream>
 #include <csignal>
 #include <string>
 #include <mutex>
@@ -17,21 +18,12 @@
 #include "guidance_manager.hpp"
 #include "guidance_configuration.hpp"
 
-namespace {
-volatile std::sig_atomic_t gSignalStatus;
-}
-
 #define CAM_LEFT true
 #define CAM_RIGHT false
 #define GRAVITY 9.80665
 
 std::mutex g_guidance_mutex;
 int guidance_data_rcvd_cb(int event, int data_len, char *content);
-
-void signal_handler(int signal) {
-  stop_transfer();
-  release_transfer();
-}
 
 #define RETURN_IF_ERR(err_code)                                                \
   {                                                                            \
@@ -44,7 +36,6 @@ void signal_handler(int signal) {
   }
 
 e_sdk_err_code GuidanceManager::init(ros::NodeHandle pnh) {
-  std::signal(SIGINT, signal_handler);
   pnh_ = pnh;
   it_ = new image_transport::ImageTransport(pnh_);
 
@@ -75,26 +66,28 @@ e_sdk_err_code GuidanceManager::init(ros::NodeHandle pnh) {
 
   // init multi-publishers
   for (int i = 0; i < CAMERA_PAIR_NUM; ++i) {
+    // init node handles
+    depth_pnh_[i] = ros::NodeHandle(pnh_, "cam" + std::to_string(i) + "/depth");
+    left_pnh_[i] = ros::NodeHandle(pnh_, "cam" + std::to_string(i) + "/left");
+    right_pnh_[i] = ros::NodeHandle(pnh_, "cam" + std::to_string(i) + "/right");
+
     // init camera parameters
     createDepthPublisher(
-        pnh_, i,
-        "/home/andre/Documents/mrasl/dji_challenge/catkin_ws/src/"
-        "mrasl_guidance_ros/calibration_files/camera_params_left.ini");
+        depth_pnh_[i], i,
+        "calibration_files/camera_params_left.ini");
 
     createImagePublisher(
-        pnh_, i,
-        "/home/andre/Documents/mrasl/dji_challenge/catkin_ws/src/"
-        "mrasl_guidance_ros/calibration_files/camera_params_right.ini",
+        right_pnh_[i], i,
+        "calibration_files/camera_params_right.ini",
         false);
 
     createImagePublisher(
-        pnh_, i,
-        "/home/andre/Documents/mrasl/dji_challenge/catkin_ws/src/"
-        "mrasl_guidance_ros/calibration_files/camera_params_right.ini",
+        left_pnh_[i], i,
+        "calibration_files/camera_params_left.ini",
         true);
 
     disparity_image_pub_[i] = pnh_.advertise<stereo_msgs::DisparityImage>(
-        "cam" + std::to_string(i) + "/disparity", 1);
+        "cam" + std::to_string(i) + "/left/disparity", 1);
     ultrasonic_pub_[i] =
         pnh_.advertise<sensor_msgs::Range>("sonar" + std::to_string(i), 10);
   }
@@ -168,13 +161,23 @@ e_sdk_err_code GuidanceManager::init(ros::NodeHandle pnh) {
   return e_OK;
 }
 
+void GuidanceManager::stopTransfer() {
+  std::lock_guard<std::mutex> guard(g_guidance_mutex);
+  stop_transfer();
+}
+
+void GuidanceManager::releaseTransfer() {
+  std::lock_guard<std::mutex> guard(g_guidance_mutex);
+  release_transfer();
+}
+
 void GuidanceManager::createDepthPublisher(ros::NodeHandle nh,
                                            unsigned int index,
                                            std::string cam_info_path) {
   std::string idx = std::to_string(index);
-  std::string cam_topic = "cam" + idx + "/depth/image_raw";
+  std::string cam_topic = "depth/image_raw";
   std::string global_topic = "guidance/cam" + idx + "/left/image_raw";
-  std::string cam_info_uri = "file://" + cam_info_path;
+  std::string cam_info_uri = "package://mrasl_guidance/" + cam_info_path;
 
   depth_cam_info_man[index] = new camera_info_manager::CameraInfoManager(
       nh, global_topic, cam_info_path);
@@ -194,7 +197,7 @@ void GuidanceManager::createImagePublisher(ros::NodeHandle nh,
   std::string global_topic = is_left
                                  ? "guidance/cam" + idx + "/left/image_raw"
                                  : "guidance/cam" + idx + "/right/image_raw";
-  std::string cam_info_uri = "file://" + cam_info_path;
+  std::string cam_info_uri = "package://mrasl_guidance/" + cam_info_path;
 
   if (is_left) {
     left_cam_info_man[index] = new camera_info_manager::CameraInfoManager(
@@ -223,18 +226,18 @@ cv::Mat depth8(IMG_HEIGHT, IMG_WIDTH, CV_8UC1);
 void GuidanceManager::image_handler(int data_len, char *content) {
   // Figure out what kind of image this is and which camera it came from
   image_data *data = (image_data *)content;
-  
-  //time stamping
+
+  // time stamping
   if (timestamp_buf_.count(data->frame_index) < 1) {
-		// didn't get this frame index yet
-		TimeStamp t;
-		t.frame_index = data->frame_index;
-		t.time_stamp = data->time_stamp;
-		t.rostime = ros::Time::now();
-		timestamp_buf_[data->frame_index] = t;
-	}
+    // didn't get this frame index yet
+    TimeStamp t;
+    t.frame_index = data->frame_index;
+    t.time_stamp = data->time_stamp;
+    t.rostime = ros::Time::now();
+    timestamp_buf_[data->frame_index] = t;
+  }
   ros::Time time = timestamp_buf_[data->frame_index].rostime;
-  
+
   for (int i = 0; i < CAMERA_PAIR_NUM; ++i) {
     if (data->m_greyscale_image_left[i] != NULL) {
       memcpy(image_left_.image.data, data->m_greyscale_image_left[i], IMG_SIZE);
@@ -248,6 +251,8 @@ void GuidanceManager::image_handler(int data_len, char *content) {
       ci_left->header.frame_id = "cam" + std::to_string(i) + "_left";
 
       left_image_pub_[i]->publish(image_left_.toImageMsg(), ci_left);
+      // std::cout << "left " << data->frame_index << '\t' << data->time_stamp
+      // << std::endl;
     }
     if (data->m_greyscale_image_right[i] != NULL) {
       memcpy(image_right_.image.data, data->m_greyscale_image_right[i],
@@ -276,6 +281,7 @@ void GuidanceManager::image_handler(int data_len, char *content) {
 
       sensor_msgs::CameraInfoPtr ci_depth(
           new sensor_msgs::CameraInfo(depth_cam_info_man[i]->getCameraInfo()));
+
       ci_depth->header.stamp = image_depth_.header.stamp;
       ci_depth->header.frame_id = image_depth_.header.frame_id;
 
@@ -368,8 +374,7 @@ void GuidanceManager::velocity_handler(int data_len, char *content) {
 void GuidanceManager::obstacle_handler(int data_len, char *content) {}
 
 void GuidanceManager::cleanTimestampBuf() {
-	if(timestamp_buf_.size() > 5)
-	  timestamp_buf_.erase(timestamp_buf_.begin());
+  if (timestamp_buf_.size() > 5) timestamp_buf_.erase(timestamp_buf_.begin());
 }
 
 int guidance_data_rcvd_cb(int event, int data_len, char *content) {
@@ -398,6 +403,6 @@ int guidance_data_rcvd_cb(int event, int data_len, char *content) {
     default:
       break;
   }
-  
+
   GuidanceManager::getInstance()->cleanTimestampBuf();
 }

@@ -1,7 +1,7 @@
 #ifndef GUIDANCE_CONFIGURATION_HPP
 #define GUIDANCE_CONFIGURATION_HPP
 #include <ros/ros.h>
-#include <guidance/guidanceConfig.h>
+#include <mrasl_guidance/guidanceConfig.h>
 
 class GuidanceConfiguration {
  public:
@@ -9,11 +9,11 @@ class GuidanceConfiguration {
   static constexpr unsigned int cam_right = 0;
   static constexpr unsigned int cam_left = 1;
   static constexpr unsigned int num_cams = 2;
-  static constexpr unsigned int bottom  = 0;
-  static constexpr unsigned int front   = 1;
-  static constexpr unsigned int left    = 2;
-  static constexpr unsigned int back    = 3;
-  static constexpr unsigned int right   = 4;
+  static constexpr unsigned int bottom = 0;
+  static constexpr unsigned int front = 1;
+  static constexpr unsigned int left = 2;
+  static constexpr unsigned int back = 3;
+  static constexpr unsigned int right = 4;
   static constexpr unsigned int num_cam_pairs = 5;
 
   void applyFromNodeHandle(ros::NodeHandle nh);

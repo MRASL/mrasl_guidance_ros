@@ -39,6 +39,8 @@ class GuidanceManager {
 
   // static void setNodeHandle(ros::NodeHandle pnh) { pnh_ = pnh; }
   e_sdk_err_code init(ros::NodeHandle pnh);
+  void stopTransfer();
+  void releaseTransfer();
 
   e_sdk_err_code enable_imu();
   e_sdk_err_code enable_ultrasonic();
@@ -64,7 +66,7 @@ class GuidanceManager {
   void motion_handler(int data_len, char *content);
   void velocity_handler(int data_len, char *content);
   void obstacle_handler(int data_len, char *content);
-  
+
   /**
    *  Pop off old time stamps that we don't need
    */
@@ -77,16 +79,19 @@ class GuidanceManager {
   void set_maxDiff(double maxDiff) { maxSpeckleDiff_ = maxDiff; };
 
  private:
-  ros::NodeHandle pnh_;
-  static GuidanceManager *s_instance_;
-  GuidanceManager() {}  // Purposely hide the damn things
-  GuidanceManager(GuidanceManager const &);
-  void operator=(GuidanceManager const &);
-
 #define IMG_WIDTH 320
 #define IMG_HEIGHT 240
 #define IMG_SIZE 76800
 #define CAMERA_PAIR_NUM 5
+
+  ros::NodeHandle pnh_;
+  ros::NodeHandle depth_pnh_[CAMERA_PAIR_NUM];
+  ros::NodeHandle left_pnh_[CAMERA_PAIR_NUM];
+  ros::NodeHandle right_pnh_[CAMERA_PAIR_NUM];
+  static GuidanceManager *s_instance_;
+  GuidanceManager() {}  // Purposely hide the damn things
+  GuidanceManager(GuidanceManager const &);
+  void operator=(GuidanceManager const &);
 
   // Camera stuff
   stereo_cali calibration_params[5];
@@ -155,15 +160,14 @@ class GuidanceManager {
   ros::Publisher velocity_global_pub_;
   ros::Publisher ultrasonic_pub_[CAMERA_PAIR_NUM];
   ros::Publisher pose_pub_;
-  
-  typedef struct TimeStamp_ {
-		unsigned int frame_index;
-		unsigned int time_stamp;
-		ros::Time rostime;
-	} TimeStamp;
-	
-	std::map<unsigned int, TimeStamp> timestamp_buf_;
 
+  typedef struct TimeStamp_ {
+    unsigned int frame_index;
+    unsigned int time_stamp;
+    ros::Time rostime;
+  } TimeStamp;
+
+  std::map<unsigned int, TimeStamp> timestamp_buf_;
 };
 
 #endif  // GUIDANCE_MANAGER_HPP
