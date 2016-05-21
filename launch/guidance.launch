@@ -1,5 +1,5 @@
 <launch>
-  <node pkg="guidance" type="guidance" name="guidance" output="screen">
+  <node pkg="mrasl_guidance" type="guidance" name="guidance" output="screen">
   </node>
   
   <node pkg="tf" type="static_transform_publisher" name="link1_broadcaster"
