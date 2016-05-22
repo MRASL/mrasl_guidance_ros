@@ -11,6 +11,7 @@
 #include <sensor_msgs/Imu.h>
 #include <sensor_msgs/LaserScan.h>
 #include <sensor_msgs/Range.h>
+#include <sensor_msgs/CameraInfo.h>
 #include <geometry_msgs/Vector3Stamped.h>
 #include <geometry_msgs/TwistStamped.h>
 
@@ -37,6 +38,7 @@ int guidance_data_rcvd_cb(int event, int data_len, char *content);
 
 e_sdk_err_code GuidanceManager::init(ros::NodeHandle pnh) {
   pnh_ = pnh;
+  config.applyFromNodeHandle(pnh_);
   it_ = new image_transport::ImageTransport(pnh_);
 
   // Init message buffers
@@ -63,43 +65,6 @@ e_sdk_err_code GuidanceManager::init(ros::NodeHandle pnh) {
       0.785398;  // TODO defaulted to 45 degrees in radians; need real value
   ultrasonic_msg_.min_range = 0.1;
   ultrasonic_msg_.max_range = 8.0;
-
-  // init multi-publishers
-  for (int i = 0; i < CAMERA_PAIR_NUM; ++i) {
-    // init node handles
-    depth_pnh_[i] = ros::NodeHandle(pnh_, "cam" + std::to_string(i) + "/depth");
-    left_pnh_[i] = ros::NodeHandle(pnh_, "cam" + std::to_string(i) + "/left");
-    right_pnh_[i] = ros::NodeHandle(pnh_, "cam" + std::to_string(i) + "/right");
-
-    // init camera parameters
-    createDepthPublisher(
-        depth_pnh_[i], i,
-        "calibration_files/camera_params_left.ini");
-
-    createImagePublisher(
-        right_pnh_[i], i,
-        "calibration_files/camera_params_right.ini",
-        false);
-
-    createImagePublisher(
-        left_pnh_[i], i,
-        "calibration_files/camera_params_left.ini",
-        true);
-
-    disparity_image_pub_[i] = pnh_.advertise<stereo_msgs::DisparityImage>(
-        "cam" + std::to_string(i) + "/left/disparity", 1);
-    ultrasonic_pub_[i] =
-        pnh_.advertise<sensor_msgs::Range>("sonar" + std::to_string(i), 10);
-  }
-
-  imu_pub_ = pnh_.advertise<sensor_msgs::Imu>("imu", 10);
-  obstacle_distance_pub_ =
-      pnh_.advertise<sensor_msgs::LaserScan>("obstacle_distance", 10);
-  velocity_body_pub_ =
-      pnh_.advertise<geometry_msgs::TwistStamped>("body/velocity", 10);
-  velocity_global_pub_ =
-      pnh_.advertise<geometry_msgs::TwistStamped>("global/velocity", 10);
-  pose_pub_ = pnh_.advertise<geometry_msgs::PoseStamped>("global/pose", 10);
 
   // Start configuring the Guidance
   e_sdk_err_code err_code = static_cast<e_sdk_err_code>(reset_config());
@@ -129,25 +94,77 @@ e_sdk_err_code GuidanceManager::init(ros::NodeHandle pnh) {
               << calibration_params[i].baseline << std::endl;
   }
 
-  std::cout << "select imu" << std::endl;
-  select_imu();
-  std::cout << "select ultrasonic" << std::endl;
-  select_ultrasonic();
-  std::cout << "select obstacle" << std::endl;
-  select_obstacle_distance();
-  std::cout << "select velocity" << std::endl;
-  select_velocity();
-  std::cout << "select motion" << std::endl;
-  select_motion();
+  // init multi-publishers and select data at the same time
+  for (int i = 0; i < CAMERA_PAIR_NUM; ++i) {
+    // init node handles
+    depth_pnh_[i] = ros::NodeHandle(pnh_, "cam" + std::to_string(i) + "/depth");
+    left_pnh_[i] = ros::NodeHandle(pnh_, "cam" + std::to_string(i) + "/left");
+    right_pnh_[i] = ros::NodeHandle(pnh_, "cam" + std::to_string(i) + "/right");
 
-  std::cout << "select left" << std::endl;
-  select_greyscale_image(e_vbus1, CAM_LEFT);
-  std::cout << "select right" << std::endl;
-  select_greyscale_image(e_vbus1, CAM_RIGHT);
-  std::cout << "select depth" << std::endl;
-  select_depth_image(e_vbus1);
-  std::cout << "select disp" << std::endl;
-  select_disparity_image(e_vbus1);
+    // init camera puplishers
+    if (config.isDepthEnabled(i)) {
+      createDepthPublisher(depth_pnh_[i], i,
+                           "calibration_files/camera_params_left.ini");
+      std::cout << "select depth" << std::endl;
+      select_depth_image(static_cast<e_vbus_index>(i));
+    }
+
+    if (config.isCamEnabled(i, GuidanceConfiguration::cam_right)) {
+      createImagePublisher(right_pnh_[i], i,
+                           "calibration_files/camera_params_right.ini", false);
+      std::cout << "select right" << std::endl;
+      select_greyscale_image(static_cast<e_vbus_index>(i), CAM_RIGHT);
+    }
+
+    if (config.isCamEnabled(i, GuidanceConfiguration::cam_left)) {
+      createImagePublisher(left_pnh_[i], i,
+                           "calibration_files/camera_params_left.ini", true);
+      std::cout << "select left" << std::endl;
+      select_greyscale_image(static_cast<e_vbus_index>(i), CAM_LEFT);
+    }
+
+    if (config.isDisparityEnabled(i)) {
+      disparity_image_pub_[i] = pnh_.advertise<stereo_msgs::DisparityImage>(
+          "cam" + std::to_string(i) + "/left/disparity", 1);
+      std::cout << "select disp" << std::endl;
+      select_disparity_image(static_cast<e_vbus_index>(i));
+    }
+
+    if (config.isUltrasonicEnabled()) {
+      ultrasonic_pub_[i] =
+          pnh_.advertise<sensor_msgs::Range>("sonar" + std::to_string(i), 10);
+      ROS_INFO("select ultrasonic");
+      select_ultrasonic();
+    }
+  }
+
+  if (config.isImuEnabled()) {
+    imu_pub_ = pnh_.advertise<sensor_msgs::Imu>("imu", 10);
+    ROS_INFO("select imu");
+    select_imu();
+  }
+
+  if (config.isObstacleEnabled()) {
+    obstacle_distance_pub_ =
+        pnh_.advertise<sensor_msgs::LaserScan>("obstacle_distance", 10);
+    ROS_INFO("select obstacle distance");
+    select_obstacle_distance();
+  }
+
+  if (config.isVelocityEnabled()) {
+    velocity_body_pub_ =
+        pnh_.advertise<geometry_msgs::TwistStamped>("body/velocity", 10);
+    ROS_INFO("select velocity");
+    select_velocity();
+  }
+
+  if (config.isMotionEnabled()) {
+    velocity_global_pub_ =
+        pnh_.advertise<geometry_msgs::TwistStamped>("global/velocity", 10);
+    pose_pub_ = pnh_.advertise<geometry_msgs::PoseStamped>("global/pose", 10);
+    ROS_INFO("select motion");
+    select_motion();
+  }
 
   std::cout << "set event handler" << std::endl;
   err_code =
@@ -176,15 +193,24 @@ void GuidanceManager::createDepthPublisher(ros::NodeHandle nh,
                                            std::string cam_info_path) {
   std::string idx = std::to_string(index);
   std::string cam_topic = "depth/image_raw";
-  std::string global_topic = "guidance/cam" + idx + "/left/image_raw";
+  std::string camera_name = "guidance/cam" + idx + "/left";
   std::string cam_info_uri = "package://mrasl_guidance/" + cam_info_path;
 
   depth_cam_info_man[index] = new camera_info_manager::CameraInfoManager(
-      nh, global_topic, cam_info_path);
+      nh, camera_name, cam_info_path);
 
   depth_cam_info_man[index]->loadCameraInfo(cam_info_uri);
   depth_image_pub_[index] =
       new image_transport::CameraPublisher(it_->advertiseCamera(cam_topic, 1));
+
+  sensor_msgs::CameraInfo cinfo = depth_cam_info_man[index]->getCameraInfo();
+  cinfo.P[2] = calibration_params[index].cu;
+  cinfo.P[6] = calibration_params[index].cv;
+  cinfo.P[0] = calibration_params[index].focal;
+  cinfo.P[5] = calibration_params[index].focal;
+  cinfo.P[3] = 0; // The depth image is on the left camera
+  cinfo.P[7] = 0;
+  depth_cam_info_man[index]->setCameraInfo(cinfo);
 }
 
 void GuidanceManager::createImagePublisher(ros::NodeHandle nh,
@@ -194,23 +220,39 @@ void GuidanceManager::createImagePublisher(ros::NodeHandle nh,
   std::string idx = std::to_string(index);
   std::string cam_topic = is_left ? "cam" + idx + "/left/image_raw"
                                   : "cam" + idx + "/right/image_raw";
-  std::string global_topic = is_left
-                                 ? "guidance/cam" + idx + "/left/image_raw"
-                                 : "guidance/cam" + idx + "/right/image_raw";
+  std::string camera_name = is_left
+                                 ? "guidance/cam" + idx + "/left"
+                                 : "guidance/cam" + idx + "/right";
   std::string cam_info_uri = "package://mrasl_guidance/" + cam_info_path;
 
   if (is_left) {
     left_cam_info_man[index] = new camera_info_manager::CameraInfoManager(
-        nh, global_topic, cam_info_path);
+        nh, camera_name, cam_info_path);
     left_cam_info_man[index]->loadCameraInfo(cam_info_uri);
     left_image_pub_[index] = new image_transport::CameraPublisher(
         it_->advertiseCamera(cam_topic, 1));
+    sensor_msgs::CameraInfo cinfo = left_cam_info_man[index]->getCameraInfo();
+    cinfo.P[2] = calibration_params[index].cu;
+    cinfo.P[6] = calibration_params[index].cv;
+    cinfo.P[0] = calibration_params[index].focal;
+    cinfo.P[5] = calibration_params[index].focal;
+    cinfo.P[3] = 0; // The depth image is on the left camera
+    cinfo.P[7] = 0;
+    left_cam_info_man[index]->setCameraInfo(cinfo);
   } else {
     right_cam_info_man[index] = new camera_info_manager::CameraInfoManager(
-        nh, global_topic, cam_info_path);
+        nh, camera_name, cam_info_path);
     right_cam_info_man[index]->loadCameraInfo(cam_info_uri);
     right_image_pub_[index] = new image_transport::CameraPublisher(
         it_->advertiseCamera(cam_topic, 1));
+    sensor_msgs::CameraInfo cinfo = right_cam_info_man[index]->getCameraInfo();
+    cinfo.P[2] = calibration_params[index].cu;
+    cinfo.P[6] = calibration_params[index].cv;
+    cinfo.P[0] = calibration_params[index].focal;
+    cinfo.P[5] = calibration_params[index].focal;
+    cinfo.P[3] = -calibration_params[index].focal * calibration_params[index].baseline; // Tx
+    cinfo.P[7] = 0; // Ty
+    right_cam_info_man[index]->setCameraInfo(cinfo);
   }
 }
 
@@ -344,21 +386,21 @@ void GuidanceManager::motion_handler(int data_len, char *content) {
   twist_global_msg_.twist.linear.z = m->velocity_in_global_z;
   velocity_global_pub_.publish(twist_global_msg_);
   /*
-    static tf2_ros::TransformBroadcaster br;
-    geometry_msgs::TransformStamped transformStamped;
+     static tf2_ros::TransformBroadcaster br;
+     geometry_msgs::TransformStamped transformStamped;
 
-    transformStamped.header.stamp = ros::Time::now();
-    transformStamped.header.frame_id = "world";
-    transformStamped.child_frame_id = "guidance";
-    transformStamped.transform.translation.x = m->position_in_global_x;
-    transformStamped.transform.translation.y = m->position_in_global_y;
-    transformStamped.transform.translation.z = m->position_in_global_z;
-    transformStamped.transform.rotation.x = m->q1;
-    transformStamped.transform.rotation.y = m->q2;
-    transformStamped.transform.rotation.z = m->q3;
-    transformStamped.transform.rotation.w = m->q0;
+     transformStamped.header.stamp = ros::Time::now();
+     transformStamped.header.frame_id = "world";
+     transformStamped.child_frame_id = "guidance";
+     transformStamped.transform.translation.x = m->position_in_global_x;
+     transformStamped.transform.translation.y = m->position_in_global_y;
+     transformStamped.transform.translation.z = m->position_in_global_z;
+     transformStamped.transform.rotation.x = m->q1;
+     transformStamped.transform.rotation.y = m->q2;
+     transformStamped.transform.rotation.z = m->q3;
+     transformStamped.transform.rotation.w = m->q0;
 
-    br.sendTransform(transformStamped);*/
+     br.sendTransform(transformStamped);*/
 }
 
 void GuidanceManager::velocity_handler(int data_len, char *content) {

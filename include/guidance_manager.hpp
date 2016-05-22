@@ -123,6 +123,7 @@ class GuidanceManager {
    * Apply a configuration to the Guidance
    */
   e_sdk_err_code configureGuidance(void);
+  GuidanceConfiguration config;
 
   // image processing stuff
   int maxSpeckleSize_;

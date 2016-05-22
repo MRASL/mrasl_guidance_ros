@@ -5,7 +5,7 @@
 
 class GuidanceConfiguration {
  public:
-  GuidanceConfiguration();
+  GuidanceConfiguration(){};
   static constexpr unsigned int cam_right = 0;
   static constexpr unsigned int cam_left = 1;
   static constexpr unsigned int num_cams = 2;

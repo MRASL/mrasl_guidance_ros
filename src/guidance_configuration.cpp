@@ -10,33 +10,29 @@ void GuidanceConfiguration::applyFromNodeHandle(ros::NodeHandle nh) {
   nh.getParam("enable_velocity", enable_velocity_);
   nh.getParam("enable_motion", enable_motion_);
 
-  nh.getParam("enable_depth_front", depth_enabled_[front]);
-  nh.getParam("enable_depth_right", depth_enabled_[left]);
-  nh.getParam("enable_depth_back", depth_enabled_[back]);
-  nh.getParam("enable_depth_left", depth_enabled_[right]);
-  nh.getParam("enable_depth_botto", depth_enabled_[bottom]);
+  nh.getParam("camera_front/enable_depth", depth_enabled_[front]);
+  nh.getParam("camera_left/enable_depth", depth_enabled_[left]);
+  nh.getParam("camera_back/enable_depth", depth_enabled_[back]);
+  nh.getParam("camera_right/enable_depth", depth_enabled_[right]);
+  nh.getParam("camera_bottom/enable_depth", depth_enabled_[bottom]);
 
-  nh.getParam("enable_disparity_front", disparity_enabled_[front]);
-  nh.getParam("enable_disparity_right", disparity_enabled_[right]);
-  nh.getParam("enable_disparity_back", disparity_enabled_[back]);
-  nh.getParam("enable_disparity_left", disparity_enabled_[left]);
-  nh.getParam("enable_disparity_bottom", disparity_enabled_[bottom]);
+  nh.getParam("camera_front/enable_disparity", disparity_enabled_[front]);
+  nh.getParam("camera_left/enable_disparity", disparity_enabled_[right]);
+  nh.getParam("camera_back/enable_disparity", disparity_enabled_[back]);
+  nh.getParam("camera_right/enable_disparity", disparity_enabled_[left]);
+  nh.getParam("camera_bottom/enable_disparity", disparity_enabled_[bottom]);
 
-  nh.getParam("config.enable_camera_front_left", cam_enabled_[front][cam_left]);
-  nh.getParam("config.enable_camera_right_left", cam_enabled_[right][cam_left]);
-  nh.getParam("config.enable_camera_back_left", cam_enabled_[back][cam_left]);
-  nh.getParam("config.enable_camera_left_left", cam_enabled_[left][cam_left]);
-  nh.getParam("config.enable_camera_bottom_left",
-              cam_enabled_[bottom][cam_left]);
+  nh.getParam("camera_front/enable_left", cam_enabled_[front][cam_left]);
+  nh.getParam("camera_left/enable_left", cam_enabled_[right][cam_left]);
+  nh.getParam("camera_back/enable_left", cam_enabled_[back][cam_left]);
+  nh.getParam("camera_right/enable_left", cam_enabled_[left][cam_left]);
+  nh.getParam("camera_bottom/enable_left", cam_enabled_[bottom][cam_left]);
 
-  nh.getParam("config.enable_camera_front_right",
-              cam_enabled_[front][cam_right]);
-  nh.getParam("config.enable_camera_right_right",
-              cam_enabled_[right][cam_right]);
-  nh.getParam("config.enable_camera_back_right", cam_enabled_[back][cam_right]);
-  nh.getParam("config.enable_camera_left_right", cam_enabled_[left][cam_right]);
-  nh.getParam("config.enable_camera_bottom_right",
-              cam_enabled_[bottom][cam_right]);
+  nh.getParam("camera_front/enable_right", cam_enabled_[front][cam_right]);
+  nh.getParam("camera_left/enable_right", cam_enabled_[right][cam_right]);
+  nh.getParam("camera_back/enable_right", cam_enabled_[back][cam_right]);
+  nh.getParam("camera_right/enable_right", cam_enabled_[left][cam_right]);
+  nh.getParam("camera_bottom/enable_right", cam_enabled_[bottom][cam_right]);
 }
 
 void GuidanceConfiguration::applyConfig(guidance::guidanceConfig config) {
