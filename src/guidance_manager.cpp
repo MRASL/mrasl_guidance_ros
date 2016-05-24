@@ -133,9 +133,12 @@ e_sdk_err_code GuidanceManager::init(ros::NodeHandle pnh) {
     if (config.isUltrasonicEnabled()) {
       ultrasonic_pub_[i] =
           pnh_.advertise<sensor_msgs::Range>("sonar" + std::to_string(i), 10);
-      ROS_INFO("select ultrasonic");
-      select_ultrasonic();
     }
+  }
+
+  if (config.isUltrasonicEnabled()) {
+    ROS_INFO("select ultrasonic");
+    select_ultrasonic();
   }
 
   if (config.isImuEnabled()) {
@@ -362,6 +365,7 @@ void GuidanceManager::ultrasonic_handler(int data_len, char *content) {
   for (int i = 0; i < CAMERA_PAIR_NUM; ++i) {
     ultrasonic_msg_.header.frame_id = "sonar" + std::to_string(i);
     ultrasonic_msg_.range = 0.001f * ultrasonic->ultrasonic[i];
+    ultrasonic_pub_[i].publish(ultrasonic_msg_);
   }
 }
 
