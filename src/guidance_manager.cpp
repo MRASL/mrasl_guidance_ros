@@ -195,8 +195,8 @@ void GuidanceManager::createDepthPublisher(ros::NodeHandle nh,
                                            unsigned int index,
                                            std::string cam_info_path) {
   std::string idx = std::to_string(index);
-  std::string cam_topic = "depth/image_raw";
-  std::string camera_name = "guidance/cam" + idx + "/left";
+  std::string cam_topic = "cam" + idx + "/depth/image_raw";
+  std::string camera_name = "guidance/cam" + idx + "/depth";
   std::string cam_info_uri = "package://mrasl_guidance/" + cam_info_path;
 
   depth_cam_info_man[index] = new camera_info_manager::CameraInfoManager(
