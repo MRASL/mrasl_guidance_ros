@@ -105,7 +105,7 @@ e_sdk_err_code GuidanceManager::init(ros::NodeHandle pnh) {
     depth_pnh_[i] = ros::NodeHandle(pnh_, "cam" + std::to_string(i) + "/depth");
     left_pnh_[i] = ros::NodeHandle(pnh_, "cam" + std::to_string(i) + "/left");
     right_pnh_[i] = ros::NodeHandle(pnh_, "cam" + std::to_string(i) + "/right");
- 
+
     // init camera puplishers
     if (config.isDepthEnabled(i)) {
       createDepthPublisher(depth_pnh_[i], i,
@@ -355,7 +355,17 @@ void GuidanceManager::image_handler(int data_len, char *content) {
 void GuidanceManager::imu_handler(int data_len, char *content) {
   imu *imu_data = (imu *)content;
   imu_msg_.header.frame_id = "imu";
-  imu_msg_.header.stamp = ros::Time::now();
+  // time stamping
+  if (timestamp_buf_.count(imu_data->frame_index) < 1) {
+    // didn't get this frame index yet
+    TimeStamp t;
+    t.frame_index = imu_data->frame_index;
+    t.time_stamp = imu_data->time_stamp;
+    t.rostime = ros::Time::now();
+    timestamp_buf_[imu_data->frame_index] = t;
+  }
+  ros::Time time = timestamp_buf_[imu_data->frame_index].rostime;
+  imu_msg_.header.stamp = time;
   imu_msg_.linear_acceleration.x = imu_data->acc_x * GRAVITY;
   imu_msg_.linear_acceleration.y = imu_data->acc_y * GRAVITY;
   imu_msg_.linear_acceleration.z = imu_data->acc_z * GRAVITY;
@@ -427,7 +437,7 @@ void GuidanceManager::velocity_handler(int data_len, char *content) {
 void GuidanceManager::obstacle_handler(int data_len, char *content) {}
 
 void GuidanceManager::cleanTimestampBuf() {
-  if (timestamp_buf_.size() > 5) timestamp_buf_.erase(timestamp_buf_.begin());
+  if (timestamp_buf_.size() > 25) timestamp_buf_.erase(timestamp_buf_.begin());
 }
 
 int guidance_data_rcvd_cb(int event, int data_len, char *content) {
