@@ -293,6 +293,7 @@ void GuidanceManager::image_handler(int data_len, char *content) {
       memcpy(image_left_.image.data, data->m_greyscale_image_left[i], IMG_SIZE);
       image_left_.header.frame_id = "cam" + std::to_string(i) + "_left";
       image_left_.header.stamp = time;
+      image_left_.header.seq = data->frame_index;
       image_left_.encoding = sensor_msgs::image_encodings::MONO8;
 
       sensor_msgs::CameraInfoPtr ci_left(
@@ -309,12 +310,14 @@ void GuidanceManager::image_handler(int data_len, char *content) {
              IMG_SIZE);
       image_right_.header.frame_id = "cam" + std::to_string(i) + "_right";
       image_right_.header.stamp = time;
+      image_right_.header.seq = data->frame_index;
       image_right_.encoding = sensor_msgs::image_encodings::MONO8;
 
       sensor_msgs::CameraInfoPtr ci_right(
           new sensor_msgs::CameraInfo(right_cam_info_man[i]->getCameraInfo()));
       ci_right->header.stamp = image_right_.header.stamp;
       ci_right->header.frame_id = image_right_.header.frame_id;
+      ci_right->header.seq = data->frame_index;
       right_image_pub_[i]->publish(image_right_.toImageMsg(), ci_right);
     }
     if (data->m_depth_image[i] != NULL) {
@@ -327,6 +330,7 @@ void GuidanceManager::image_handler(int data_len, char *content) {
       image_depth_.image = mat_depth16_ / 128.0;
       image_depth_.header.frame_id = "cam" + std::to_string(i) + "_left";
       image_depth_.header.stamp = time;
+      image_depth_.header.seq = data->frame_index;
       image_depth_.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
 
       sensor_msgs::CameraInfoPtr ci_depth(
@@ -334,7 +338,7 @@ void GuidanceManager::image_handler(int data_len, char *content) {
 
       ci_depth->header.stamp = image_depth_.header.stamp;
       ci_depth->header.frame_id = image_depth_.header.frame_id;
-
+      ci_depth->header.seq = data->frame_index;
       depth_image_pub_[i]->publish(image_depth_.toImageMsg(), ci_depth);
       mat_depth16_.convertTo(mat_depth16_, CV_16SC1);
     }
@@ -345,6 +349,7 @@ void GuidanceManager::image_handler(int data_len, char *content) {
       image_disparity_.image = *image_cv_disparity16_.toImageMsg();
       image_disparity_.header.frame_id = "cam" + std::to_string(i) + "_left";
       image_disparity_.header.stamp = time;
+      image_disparity_.header.seq = data->frame_index;
       image_disparity_.f = calibration_params[i].focal;
       image_disparity_.T = calibration_params[i].baseline;
       disparity_image_pub_[i].publish(image_disparity_);
@@ -365,6 +370,7 @@ void GuidanceManager::imu_handler(int data_len, char *content) {
     timestamp_buf_[imu_data->frame_index] = t;
   }
   ros::Time time = timestamp_buf_[imu_data->frame_index].rostime;
+  imu_msg_.header.seq = imu_data->frame_index;
   imu_msg_.header.stamp = time;
   imu_msg_.linear_acceleration.x = imu_data->acc_x * GRAVITY;
   imu_msg_.linear_acceleration.y = imu_data->acc_y * GRAVITY;
