@@ -341,8 +341,8 @@ void GuidanceManager::image_handler(int data_len, char *content) {
     if (data->m_disparity_image[i] != NULL) {
       memcpy(image_cv_disparity16_.image.data, data->m_disparity_image[i],
              IMG_SIZE * 2);
-      image_cv_disparity16_.convertTo(image_cv_disparity32_, CV_32FC1);
-      image_disparity_.image = *image_cv_disparity_.toImageMsg();
+      image_cv_disparity16_.image.convertTo(image_cv_disparity32_.image, CV_32FC1);
+      image_disparity_.image = *image_cv_disparity16_.toImageMsg();
       image_disparity_.header.frame_id = "cam" + std::to_string(i) + "_left";
       image_disparity_.header.stamp = time;
       image_disparity_.f = calibration_params[i].focal;

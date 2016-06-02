@@ -67,7 +67,7 @@ camera_left:
   sensor_position: {x:  0.0, y:  0.0, z:  0.0} # w.r.t to guidance imu
   orientation: {x: 0.0, y: 0.0, z: 0.0, w: 0.0}
 
-enable_imu: false
+enable_imu: true
 enable_utrasonic: false
 enable_obstacle_distance: false
 enable_velocity: false
