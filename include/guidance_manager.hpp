@@ -135,7 +135,7 @@ class GuidanceManager {
   cv_bridge::CvImage image_right_;
   cv_bridge::CvImage image_depth_;
   cv::Mat mat_depth16_;
-  cv_bridge::CvImage image_cv_disparity_;
+  cv_bridge::CvImage image_cv_disparity16_, image_cv_disparity32_;
   stereo_msgs::DisparityImage image_disparity_;
   sensor_msgs::Range ultrasonic_msg_;
   sensor_msgs::Imu imu_msg_;

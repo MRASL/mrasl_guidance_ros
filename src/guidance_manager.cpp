@@ -46,7 +46,8 @@ e_sdk_err_code GuidanceManager::init(ros::NodeHandle pnh) {
   image_right_.image.create(IMG_HEIGHT, IMG_WIDTH, CV_8UC1);
   image_depth_.image.create(IMG_HEIGHT, IMG_WIDTH, CV_32FC1);
   mat_depth16_.create(IMG_HEIGHT, IMG_WIDTH, CV_16SC1);
-  image_cv_disparity_.image.create(IMG_HEIGHT, IMG_WIDTH, CV_16SC1);
+  image_cv_disparity16_.image.create(IMG_HEIGHT, IMG_WIDTH, CV_16SC1);
+  image_cv_disparity32_.image.create(IMG_HEIGHT, IMG_WIDTH, CV_32FC1);
   // Invalidate angular velocity since it's not provided, mark the covariances
   // as unknown
   imu_msg_.angular_velocity.x = imu_msg_.angular_velocity.y =
@@ -338,8 +339,9 @@ void GuidanceManager::image_handler(int data_len, char *content) {
       mat_depth16_.convertTo(mat_depth16_, CV_16SC1);
     }
     if (data->m_disparity_image[i] != NULL) {
-      memcpy(image_cv_disparity_.image.data, data->m_disparity_image[i],
+      memcpy(image_cv_disparity16_.image.data, data->m_disparity_image[i],
              IMG_SIZE * 2);
+      image_cv_disparity16_.convertTo(image_cv_disparity32_, CV_32FC1);
       image_disparity_.image = *image_cv_disparity_.toImageMsg();
       image_disparity_.header.frame_id = "cam" + std::to_string(i) + "_left";
       image_disparity_.header.stamp = time;
