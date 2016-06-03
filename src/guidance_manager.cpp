@@ -16,6 +16,7 @@
 #include <geometry_msgs/TwistStamped.h>
 
 #include <dji/guidance.h>
+#include <dji/utils.h>
 #include "guidance_manager.hpp"
 #include "guidance_configuration.hpp"
 
@@ -30,7 +31,8 @@ int guidance_data_rcvd_cb(int event, int data_len, char *content);
   {                                                                            \
     if (err_code) {                                                            \
       release_transfer();                                                      \
-      std::cout << "Error: " << (e_sdk_err_code)err_code << " at " << __LINE__ \
+      std::cout << "Error: " << (e_sdk_err_code)err_code << ' '                \
+                << dji::err_code_str(err_code) << " at " << __LINE__           \
                 << "," << __FILE__ << std::endl;                               \
       return err_code;                                                         \
     }                                                                          \
