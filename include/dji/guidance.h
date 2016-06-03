@@ -81,6 +81,17 @@ enum e_guidance_event {
 };
 
 /**
+ * @struct header
+ * @brief This structure is just a convenience structure for casting pointers to
+ * access the header of all the messages.
+ */
+typedef struct _header
+{
+  unsigned int     frame_index;
+  unsigned int     time_stamp;
+} header;
+
+/**
 *@struct  image_data
 *@brief Define image data structure. For each direction of stereo camera pair,
 *the depth image aligns with the left greyscale image.

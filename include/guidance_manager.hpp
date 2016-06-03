@@ -60,17 +60,18 @@ class GuidanceManager {
 
   // Alright at this point I have to admit this is spaghetti
   // code with extra meatballs
-  void image_handler(int data_len, char *content);
-  void imu_handler(int data_len, char *content);
-  void ultrasonic_handler(int data_len, char *content);
-  void motion_handler(int data_len, char *content);
-  void velocity_handler(int data_len, char *content);
-  void obstacle_handler(int data_len, char *content);
+  void image_handler(int data_len, char *content, ros::Time timestamp);
+  void imu_handler(int data_len, char *content, ros::Time timestamp);
+  void ultrasonic_handler(int data_len, char *content, ros::Time timestamp);
+  void motion_handler(int data_len, char *content, ros::Time timestamp);
+  void velocity_handler(int data_len, char *content, ros::Time timestamp);
+  void obstacle_handler(int data_len, char *content, ros::Time timestamp);
 
   /**
    *  Pop off old time stamps that we don't need
    */
   void cleanTimestampBuf();
+  ros::Time getTimestamp(header const *head);
 
   // parameters
   void set_maxSpeckleSize(int maxSpeckleSize) {

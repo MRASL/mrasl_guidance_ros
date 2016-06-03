@@ -275,26 +275,15 @@ e_sdk_err_code GuidanceManager::configureGuidance(void) {
 }
 
 cv::Mat depth8(IMG_HEIGHT, IMG_WIDTH, CV_8UC1);
-void GuidanceManager::image_handler(int data_len, char *content) {
+void GuidanceManager::image_handler(int data_len, char *content, ros::Time timestamp) {
   // Figure out what kind of image this is and which camera it came from
   image_data *data = (image_data *)content;
-
-  // time stamping
-  if (timestamp_buf_.count(data->frame_index) < 1) {
-    // didn't get this frame index yet
-    TimeStamp t;
-    t.frame_index = data->frame_index;
-    t.time_stamp = data->time_stamp;
-    t.rostime = ros::Time::now();
-    timestamp_buf_[data->frame_index] = t;
-  }
-  ros::Time time = timestamp_buf_[data->frame_index].rostime;
 
   for (int i = 0; i < CAMERA_PAIR_NUM; ++i) {
     if (data->m_greyscale_image_left[i] != NULL) {
       memcpy(image_left_.image.data, data->m_greyscale_image_left[i], IMG_SIZE);
       image_left_.header.frame_id = "cam" + std::to_string(i) + "_left";
-      image_left_.header.stamp = time;
+      image_left_.header.stamp = timestamp;
       image_left_.header.seq = data->frame_index;
       image_left_.encoding = sensor_msgs::image_encodings::MONO8;
 
@@ -311,7 +300,7 @@ void GuidanceManager::image_handler(int data_len, char *content) {
       memcpy(image_right_.image.data, data->m_greyscale_image_right[i],
              IMG_SIZE);
       image_right_.header.frame_id = "cam" + std::to_string(i) + "_right";
-      image_right_.header.stamp = time;
+      image_right_.header.stamp = timestamp;
       image_right_.header.seq = data->frame_index;
       image_right_.encoding = sensor_msgs::image_encodings::MONO8;
 
@@ -331,7 +320,7 @@ void GuidanceManager::image_handler(int data_len, char *content) {
       cv::medianBlur(mat_depth16_, mat_depth16_, 3);
       image_depth_.image = mat_depth16_ / 128.0;
       image_depth_.header.frame_id = "cam" + std::to_string(i) + "_left";
-      image_depth_.header.stamp = time;
+      image_depth_.header.stamp = timestamp;
       image_depth_.header.seq = data->frame_index;
       image_depth_.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
 
@@ -350,7 +339,7 @@ void GuidanceManager::image_handler(int data_len, char *content) {
       image_cv_disparity16_.image.convertTo(image_cv_disparity32_.image, CV_32FC1);
       image_disparity_.image = *image_cv_disparity16_.toImageMsg();
       image_disparity_.header.frame_id = "cam" + std::to_string(i) + "_left";
-      image_disparity_.header.stamp = time;
+      image_disparity_.header.stamp = timestamp;
       image_disparity_.header.seq = data->frame_index;
       image_disparity_.f = calibration_params[i].focal;
       image_disparity_.T = calibration_params[i].baseline;
@@ -359,21 +348,11 @@ void GuidanceManager::image_handler(int data_len, char *content) {
   }
 }
 
-void GuidanceManager::imu_handler(int data_len, char *content) {
+void GuidanceManager::imu_handler(int data_len, char *content, ros::Time timestamp) {
   imu *imu_data = (imu *)content;
   imu_msg_.header.frame_id = "imu";
-  // time stamping
-  if (timestamp_buf_.count(imu_data->frame_index) < 1) {
-    // didn't get this frame index yet
-    TimeStamp t;
-    t.frame_index = imu_data->frame_index;
-    t.time_stamp = imu_data->time_stamp;
-    t.rostime = ros::Time::now();
-    timestamp_buf_[imu_data->frame_index] = t;
-  }
-  ros::Time time = timestamp_buf_[imu_data->frame_index].rostime;
   imu_msg_.header.seq = imu_data->frame_index;
-  imu_msg_.header.stamp = time;
+  imu_msg_.header.stamp = timestamp;
   imu_msg_.linear_acceleration.x = imu_data->acc_x * GRAVITY;
   imu_msg_.linear_acceleration.y = imu_data->acc_y * GRAVITY;
   imu_msg_.linear_acceleration.z = imu_data->acc_z * GRAVITY;
@@ -384,7 +363,7 @@ void GuidanceManager::imu_handler(int data_len, char *content) {
   imu_pub_.publish(imu_msg_);
 }
 
-void GuidanceManager::ultrasonic_handler(int data_len, char *content) {
+void GuidanceManager::ultrasonic_handler(int data_len, char *content, ros::Time timestamp) {
   ultrasonic_data *ultrasonic = (ultrasonic_data *)content;
   ultrasonic_msg_.header.stamp = ros::Time::now();
   for (int i = 0; i < CAMERA_PAIR_NUM; ++i) {
@@ -394,7 +373,7 @@ void GuidanceManager::ultrasonic_handler(int data_len, char *content) {
   }
 }
 
-void GuidanceManager::motion_handler(int data_len, char *content) {
+void GuidanceManager::motion_handler(int data_len, char *content, ros::Time timestamp) {
   motion *m = (motion *)content;
   ros::Time now = ros::Time::now();
   pose_msg_.header.frame_id = "local_origin";
@@ -432,7 +411,7 @@ void GuidanceManager::motion_handler(int data_len, char *content) {
      br.sendTransform(transformStamped);*/
 }
 
-void GuidanceManager::velocity_handler(int data_len, char *content) {
+void GuidanceManager::velocity_handler(int data_len, char *content, ros::Time timestamp) {
   velocity *vo = (velocity *)content;
   twist_body_msg_.header.frame_id = "guidance";
   twist_body_msg_.header.stamp = ros::Time::now();
@@ -442,34 +421,50 @@ void GuidanceManager::velocity_handler(int data_len, char *content) {
   velocity_body_pub_.publish(twist_body_msg_);
 }
 
-void GuidanceManager::obstacle_handler(int data_len, char *content) {}
+void GuidanceManager::obstacle_handler(int data_len, char *content, ros::Time timestamp) {}
 
 void GuidanceManager::cleanTimestampBuf() {
   if (timestamp_buf_.size() > 25) timestamp_buf_.erase(timestamp_buf_.begin());
+}
+
+ros::Time GuidanceManager::getTimestamp(header const *head) {
+  // time stamping
+  if (timestamp_buf_.count(head->time_stamp) < 1) {
+    // didn't get this frame index yet
+    TimeStamp t;
+    t.frame_index = head->frame_index;
+    t.time_stamp = head->time_stamp;
+    t.rostime = ros::Time::now();
+    timestamp_buf_[head->time_stamp] = t;
+  }
+  return timestamp_buf_[head->time_stamp].rostime;
 }
 
 int guidance_data_rcvd_cb(int event, int data_len, char *content) {
   std::lock_guard<std::mutex> guard(g_guidance_mutex);
   if (content == NULL) return 1;
 
+  header* head = (header*) content;
+  ros::Time timestamp = GuidanceManager::getInstance()->getTimestamp(head);
+
   switch (event) {
     case e_image:
-      GuidanceManager::getInstance()->image_handler(data_len, content);
+      GuidanceManager::getInstance()->image_handler(data_len, content, timestamp);
       break;
     case e_imu:
-      GuidanceManager::getInstance()->imu_handler(data_len, content);
+      GuidanceManager::getInstance()->imu_handler(data_len, content, timestamp);
       break;
     case e_velocity:
-      GuidanceManager::getInstance()->velocity_handler(data_len, content);
+      GuidanceManager::getInstance()->velocity_handler(data_len, content, timestamp);
       break;
     case e_obstacle_distance:
-      GuidanceManager::getInstance()->obstacle_handler(data_len, content);
+      GuidanceManager::getInstance()->obstacle_handler(data_len, content, timestamp);
       break;
     case e_ultrasonic:
-      GuidanceManager::getInstance()->ultrasonic_handler(data_len, content);
+      GuidanceManager::getInstance()->ultrasonic_handler(data_len, content, timestamp);
       break;
     case e_motion:
-      GuidanceManager::getInstance()->motion_handler(data_len, content);
+      GuidanceManager::getInstance()->motion_handler(data_len, content, timestamp);
       break;
     default:
       break;
