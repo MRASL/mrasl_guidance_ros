@@ -315,7 +315,7 @@ void GuidanceManager::image_handler(int data_len, char *content, ros::Time times
       // 16 bit signed images, omitting processing here
       memcpy(mat_depth16_.data, data->m_depth_image[i], IMG_SIZE * 2);
 
-      cv::filterSpeckles(mat_depth16_, -16, maxSpeckleSize_, maxSpeckleDiff_);
+      cv::filterSpeckles(mat_depth16_, 0, maxSpeckleSize_, maxSpeckleDiff_);
       mat_depth16_.convertTo(mat_depth16_, CV_32FC1);
       cv::medianBlur(mat_depth16_, mat_depth16_, 3);
       image_depth_.image = mat_depth16_ / 128.0;

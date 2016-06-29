@@ -19,17 +19,17 @@ motion:
 
 camera_bottom:
   enable_depth: false
-  enable_disparity: true
+  enable_disparity: false
   enable_left: true
-  enable_right: true
+  enable_right: false
   frame_id: "guidance"
   child_frame_id: "cam0"
   sensor_position: {x:  0.0, y:  0.0, z:  0.0} # w.r.t to guidance imu
   orientation: {x: 0.0, y: 0.0, z: 0.0, w: 0.0}
 
 camera_front:
-  enable_depth: false
-  enable_disparity: true
+  enable_depth: true
+  enable_disparity: false
   enable_left: true
   enable_right: true
   frame_id: "guidance"
