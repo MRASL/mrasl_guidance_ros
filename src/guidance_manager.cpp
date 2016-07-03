@@ -315,10 +315,11 @@ void GuidanceManager::image_handler(int data_len, char *content, ros::Time times
       // 16 bit signed images, omitting processing here
       memcpy(mat_depth16_.data, data->m_depth_image[i], IMG_SIZE * 2);
 
-      cv::filterSpeckles(mat_depth16_, -16, maxSpeckleSize_, maxSpeckleDiff_);
+      cv::filterSpeckles(mat_depth16_, 25600, maxSpeckleSize_, maxSpeckleDiff_);
       mat_depth16_.convertTo(mat_depth16_, CV_32FC1);
-      cv::medianBlur(mat_depth16_, mat_depth16_, 3);
+      //cv::medianBlur(mat_depth16_, mat_depth16_, 3);
       image_depth_.image = mat_depth16_ / 128.0;
+      image_depth_.image.setTo(25600, image_depth_.image < 0.3);
       image_depth_.header.frame_id = "cam" + std::to_string(i) + "_left";
       image_depth_.header.stamp = timestamp;
       image_depth_.header.seq = data->frame_index;
@@ -336,11 +337,12 @@ void GuidanceManager::image_handler(int data_len, char *content, ros::Time times
     if (data->m_disparity_image[i] != NULL) {
       memcpy(image_cv_disparity16_.image.data, data->m_disparity_image[i],
              IMG_SIZE * 2);
-      image_cv_disparity16_.image.convertTo(image_cv_disparity32_.image, CV_32FC1);
+      //image_cv_disparity16_.image.convertTo(image_cv_disparity32_.image, CV_32FC1);
       image_disparity_.image = *image_cv_disparity16_.toImageMsg();
       image_disparity_.header.frame_id = "cam" + std::to_string(i) + "_left";
       image_disparity_.header.stamp = timestamp;
       image_disparity_.header.seq = data->frame_index;
+      image_disparity_.image.encoding = sensor_msgs::image_encodings::TYPE_16SC1;
       image_disparity_.f = calibration_params[i].focal;
       image_disparity_.T = calibration_params[i].baseline;
       disparity_image_pub_[i].publish(image_disparity_);
