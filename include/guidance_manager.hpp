@@ -19,6 +19,7 @@
 #include <dji/guidance.h>
 #include "guidance_configuration.hpp"
 #include <opencv2/opencv.hpp>
+#include <opencv2/gpu/gpu.hpp>
 
 /**
  * @brief The GuidanceManager class
@@ -91,7 +92,7 @@ class GuidanceManager {
   ros::NodeHandle left_pnh_[CAMERA_PAIR_NUM];
   ros::NodeHandle right_pnh_[CAMERA_PAIR_NUM];
   static GuidanceManager *s_instance_;
-  GuidanceManager() {}  // Purposely hide the damn things
+  GuidanceManager();  // Purposely hide the damn things
   GuidanceManager(GuidanceManager const &);
   void operator=(GuidanceManager const &);
 
@@ -122,19 +123,33 @@ class GuidanceManager {
                             std::string cam_info_path, bool is_left);
 
   /**
+   * Sends an image pair to the GPU to get block matched. The resulting depth image
+   * is kept as a private attribute;
+   * @param index         Camera index of the guidance
+   */
+  void gpuBM(unsigned int index);
+  
+  /**
    * Apply a configuration to the Guidance
    */
   e_sdk_err_code configureGuidance(void);
+
   GuidanceConfiguration config;
 
   // image processing stuff
   int maxSpeckleSize_;
   double maxSpeckleDiff_;
+  cv::gpu::StereoBM_GPU* sbm;
+  cv::gpu::GpuMat gpu_left_, gpu_right_, gpu_depth_, gpu_buf_, gpu_buf16_;
+  unsigned int sbm_idx_[CAMERA_PAIR_NUM]; // this contains the last frame_index rcvd for a certain cam pair
+  double disp2depth_const_[CAMERA_PAIR_NUM];
 
   // Message buffers
   cv_bridge::CvImage image_left_;
   cv_bridge::CvImage image_right_;
   cv_bridge::CvImage image_depth_;
+  cv_bridge::CvImage image_gpubm_buf_left_[CAMERA_PAIR_NUM];
+  cv_bridge::CvImage image_gpubm_buf_right_[CAMERA_PAIR_NUM];
   cv::Mat mat_depth16_;
   cv_bridge::CvImage image_cv_disparity16_, image_cv_disparity32_;
   stereo_msgs::DisparityImage image_disparity_;

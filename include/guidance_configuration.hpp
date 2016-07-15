@@ -35,6 +35,8 @@ class GuidanceConfiguration {
     return disparity_enabled_[pair];
   }
 
+  bool isSoftDepthEnabled(unsigned int pair) { return soft_depth_[pair]; }
+
   bool isImuEnabled() { return enable_imu_; }
   bool isUltrasonicEnabled() { return enable_utrasonic_; }
   bool isObstacleEnabled() { return enable_obstacle_distance_; }
@@ -45,6 +47,7 @@ class GuidanceConfiguration {
   bool cam_enabled_[num_cam_pairs][num_cams];
   bool depth_enabled_[num_cam_pairs];
   bool disparity_enabled_[num_cam_pairs];
+  bool soft_depth_[num_cam_pairs];
   bool enable_imu_;
   bool enable_utrasonic_;
   bool enable_obstacle_distance_;

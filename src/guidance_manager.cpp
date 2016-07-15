@@ -28,17 +28,28 @@ std::mutex g_guidance_mutex;
 int guidance_data_rcvd_cb(int event, int data_len, char *content);
 
 #define RETURN_IF_ERR(err_code)                                                \
-  {                                                                            \
-    if (err_code) {                                                            \
-      release_transfer();                                                      \
-      std::cout << "Error: " << (e_sdk_err_code)err_code << ' '                \
-                << dji::err_code_str(err_code) << " at " << __LINE__           \
-                << "," << __FILE__ << std::endl;                               \
-      return err_code;                                                         \
-    }                                                                          \
-  }
+{                                                                            \
+  if (err_code) {                                                            \
+    release_transfer();                                                      \
+    std::cout << "Error: " << (e_sdk_err_code)err_code << ' '                \
+    << dji::err_code_str(err_code) << " at " << __LINE__           \
+    << "," << __FILE__ << std::endl;                               \
+    return err_code;                                                         \
+  }                                                                          \
+}
 
-e_sdk_err_code GuidanceManager::init(ros::NodeHandle pnh) {
+GuidanceManager::GuidanceManager() :
+  gpu_left_(IMG_HEIGHT, IMG_WIDTH, CV_8U),
+  gpu_right_(IMG_HEIGHT, IMG_WIDTH, CV_8U),
+  gpu_depth_(IMG_HEIGHT, IMG_WIDTH, CV_8U),
+  gpu_buf_(IMG_HEIGHT, IMG_WIDTH, CV_8U),
+  gpu_buf16_(IMG_HEIGHT, IMG_WIDTH, CV_16SC1)
+{
+
+}
+
+e_sdk_err_code GuidanceManager::init(ros::NodeHandle pnh){
+  sbm = new cv::gpu::StereoBM_GPU(cv::StereoBM::BASIC_PRESET, 64, 15);
   pnh_ = pnh;
   config.applyFromNodeHandle(pnh_);
   it_ = new image_transport::ImageTransport(pnh_);
@@ -53,19 +64,19 @@ e_sdk_err_code GuidanceManager::init(ros::NodeHandle pnh) {
   // Invalidate angular velocity since it's not provided, mark the covariances
   // as unknown
   imu_msg_.angular_velocity.x = imu_msg_.angular_velocity.y =
-      imu_msg_.angular_velocity.z = 0;
+    imu_msg_.angular_velocity.z = 0;
   imu_msg_.angular_velocity_covariance = {-1};
   imu_msg_.linear_acceleration_covariance =
-      imu_msg_.orientation_covariance = {0};
+    imu_msg_.orientation_covariance = {0};
   // Set angular twist to 0
   twist_body_msg_.twist.angular.x = twist_body_msg_.twist.angular.y =
-      twist_body_msg_.twist.angular.z = 0;
+    twist_body_msg_.twist.angular.z = 0;
   twist_global_msg_.twist.angular.x = twist_global_msg_.twist.angular.y =
-      twist_global_msg_.twist.angular.z = 0;
+    twist_global_msg_.twist.angular.z = 0;
   // Set ultrasonic properties
   ultrasonic_msg_.radiation_type = sensor_msgs::Range::ULTRASOUND;
   ultrasonic_msg_.field_of_view =
-      0.785398;  // TODO defaulted to 45 degrees in radians; need real value
+    0.785398;  // TODO defaulted to 45 degrees in radians; need real value
   ultrasonic_msg_.min_range = 0.1;
   ultrasonic_msg_.max_range = 8.0;
   // Set disparity image constants
@@ -97,8 +108,9 @@ e_sdk_err_code GuidanceManager::init(ros::NodeHandle pnh) {
   std::cout << "cu\tcv\tfocal\tbaseline\n";
   for (int i = 0; i < CAMERA_PAIR_NUM; ++i) {
     std::cout << calibration_params[i].cu << '\t' << calibration_params[i].cv
-              << '\t' << calibration_params[i].focal << '\t'
-              << calibration_params[i].baseline << std::endl;
+      << '\t' << calibration_params[i].focal << '\t'
+      << calibration_params[i].baseline << std::endl;
+    disp2depth_const_[i] = calibration_params[i].baseline * calibration_params[i].focal;
   }
 
   // init multi-publishers and select data at the same time
@@ -111,21 +123,29 @@ e_sdk_err_code GuidanceManager::init(ros::NodeHandle pnh) {
     // init camera puplishers
     if (config.isDepthEnabled(i)) {
       createDepthPublisher(depth_pnh_[i], i,
-                           "calibration_files/camera_params_left" + std::to_string(i) + ".ini");
-      std::cout << "select depth" << std::endl;
+          "calibration_files/camera_params_left" + std::to_string(i) + ".ini");
+      std::cout << "select depth " << i << std::endl;
       select_depth_image(static_cast<e_vbus_index>(i));
+    }
+
+    if (config.isSoftDepthEnabled(i)) {
+      createDepthPublisher(depth_pnh_[i], i,
+          "calibration_files/camera_params_left" + std::to_string(i) + ".ini");
+      std::cout << "select soft depth " << i << std::endl;
+      image_gpubm_buf_left_[i].image.create(IMG_HEIGHT, IMG_WIDTH, CV_8U);
+      image_gpubm_buf_right_[i].image.create(IMG_HEIGHT, IMG_WIDTH, CV_8U);
     }
 
     if (config.isCamEnabled(i, GuidanceConfiguration::cam_right)) {
       createImagePublisher(right_pnh_[i], i,
-                           "calibration_files/camera_params_right" + std::to_string(i) + ".ini", false);
+          "calibration_files/camera_params_right" + std::to_string(i) + ".ini", false);
       std::cout << "select right" << std::endl;
       select_greyscale_image(static_cast<e_vbus_index>(i), CAM_RIGHT);
     }
 
     if (config.isCamEnabled(i, GuidanceConfiguration::cam_left)) {
       createImagePublisher(left_pnh_[i], i,
-                           "calibration_files/camera_params_left"+std::to_string(i)+".ini", true);
+          "calibration_files/camera_params_left"+std::to_string(i)+".ini", true);
       std::cout << "select left" << std::endl;
       select_greyscale_image(static_cast<e_vbus_index>(i), CAM_LEFT);
     }
@@ -139,7 +159,7 @@ e_sdk_err_code GuidanceManager::init(ros::NodeHandle pnh) {
 
     if (config.isUltrasonicEnabled()) {
       ultrasonic_pub_[i] =
-          pnh_.advertise<sensor_msgs::Range>("sonar" + std::to_string(i), 10);
+        pnh_.advertise<sensor_msgs::Range>("sonar" + std::to_string(i), 10);
     }
   }
 
@@ -156,21 +176,21 @@ e_sdk_err_code GuidanceManager::init(ros::NodeHandle pnh) {
 
   if (config.isObstacleEnabled()) {
     obstacle_distance_pub_ =
-        pnh_.advertise<sensor_msgs::LaserScan>("obstacle_distance", 10);
+      pnh_.advertise<sensor_msgs::LaserScan>("obstacle_distance", 10);
     ROS_INFO("select obstacle distance");
     select_obstacle_distance();
   }
 
   if (config.isVelocityEnabled()) {
     velocity_body_pub_ =
-        pnh_.advertise<geometry_msgs::TwistStamped>("body/velocity", 10);
+      pnh_.advertise<geometry_msgs::TwistStamped>("body/velocity", 10);
     ROS_INFO("select velocity");
     select_velocity();
   }
 
   if (config.isMotionEnabled()) {
     velocity_global_pub_ =
-        pnh_.advertise<geometry_msgs::TwistStamped>("global/velocity", 10);
+      pnh_.advertise<geometry_msgs::TwistStamped>("global/velocity", 10);
     pose_pub_ = pnh_.advertise<geometry_msgs::PoseStamped>("global/pose", 10);
     ROS_INFO("select motion");
     select_motion();
@@ -178,7 +198,7 @@ e_sdk_err_code GuidanceManager::init(ros::NodeHandle pnh) {
 
   std::cout << "set event handler" << std::endl;
   err_code =
-      static_cast<e_sdk_err_code>(set_sdk_event_handler(guidance_data_rcvd_cb));
+    static_cast<e_sdk_err_code>(set_sdk_event_handler(guidance_data_rcvd_cb));
   RETURN_IF_ERR(err_code);
 
   std::cout << "start transfer" << std::endl;
@@ -199,8 +219,8 @@ void GuidanceManager::releaseTransfer() {
 }
 
 void GuidanceManager::createDepthPublisher(ros::NodeHandle nh,
-                                           unsigned int index,
-                                           std::string cam_info_path) {
+    unsigned int index,
+    std::string cam_info_path) {
   std::string idx = std::to_string(index);
   std::string cam_topic = "cam" + idx + "/depth/image_raw";
   std::string camera_name = "guidance/cam" + idx + "/depth";
@@ -211,7 +231,7 @@ void GuidanceManager::createDepthPublisher(ros::NodeHandle nh,
 
   depth_cam_info_man[index]->loadCameraInfo(cam_info_uri);
   depth_image_pub_[index] =
-      new image_transport::CameraPublisher(it_->advertiseCamera(cam_topic, 1));
+    new image_transport::CameraPublisher(it_->advertiseCamera(cam_topic, 1));
 
   sensor_msgs::CameraInfo cinfo = depth_cam_info_man[index]->getCameraInfo();
   cinfo.P[2] = calibration_params[index].cu;
@@ -224,15 +244,15 @@ void GuidanceManager::createDepthPublisher(ros::NodeHandle nh,
 }
 
 void GuidanceManager::createImagePublisher(ros::NodeHandle nh,
-                                           unsigned int index,
-                                           std::string cam_info_path,
-                                           bool is_left) {
+    unsigned int index,
+    std::string cam_info_path,
+    bool is_left) {
   std::string idx = std::to_string(index);
   std::string cam_topic = is_left ? "cam" + idx + "/left/image_raw"
-                                  : "cam" + idx + "/right/image_raw";
+    : "cam" + idx + "/right/image_raw";
   std::string camera_name = is_left
-                                 ? "guidance/cam" + idx + "/left"
-                                 : "guidance/cam" + idx + "/right";
+    ? "guidance/cam" + idx + "/left"
+    : "guidance/cam" + idx + "/right";
   std::string cam_info_uri = "package://mrasl_guidance/" + cam_info_path;
 
   if (is_left) {
@@ -266,6 +286,30 @@ void GuidanceManager::createImagePublisher(ros::NodeHandle nh,
   }
 }
 
+void GuidanceManager::gpuBM(unsigned int index) {
+  gpu_left_.upload(image_gpubm_buf_left_[index].image);
+  gpu_right_.upload(image_gpubm_buf_right_[index].image);
+  (*sbm)(gpu_left_, gpu_right_, gpu_buf_);
+  gpu_buf_.convertTo(gpu_buf16_, CV_16S);
+ // cv::gpu::divide(gpu_buf16_, disp2depth_const_[index], gpu_buf16_);
+  gpu_buf16_.download(image_depth_.image);
+ /*
+  cv::Mat disp(image_gpubm_buf_left_[index].image.size(), CV_16S);
+  gpu_buf16_.download(disp);
+  image_depth_.image.convertTo(image_depth_.image, CV_16SC1);
+  cv::imshow("left", image_gpubm_buf_left_[index].image);
+  cv::imshow("right", image_gpubm_buf_right_[index].image);
+  double min;
+  double max;
+  cv::minMaxIdx(disp, &min, &max);
+  cv::Mat adjMap;
+  disp.convertTo(adjMap, CV_8UC1, 255 / (max-min), -min);
+  cv::Mat falseColorsMap;
+  cv::applyColorMap(adjMap, falseColorsMap, cv::COLORMAP_BONE);
+  cv::imshow("depth", falseColorsMap);
+  cv::waitKey(1);*/
+}
+
 e_sdk_err_code GuidanceManager::configureGuidance(void) {
   stop_transfer();
   reset_config();
@@ -293,8 +337,32 @@ void GuidanceManager::image_handler(int data_len, char *content, ros::Time times
       ci_left->header.frame_id = "cam" + std::to_string(i) + "_left";
 
       left_image_pub_[i]->publish(image_left_.toImageMsg(), ci_left);
-      // std::cout << "left " << data->frame_index << '\t' << data->time_stamp
-      // << std::endl;
+      if(config.isSoftDepthEnabled(i)) {
+       //image_left_.image.convertTo(image_gpubm_buf_left_[i].image, CV_32FC1);       
+       image_gpubm_buf_left_[i] = image_left_;
+       if(sbm_idx_[i] < data->frame_index) {
+          sbm_idx_[i] = data->frame_index;
+        } else if(sbm_idx_[i] == data->frame_index) {
+          gpuBM(i);
+          cv::filterSpeckles(image_depth_.image, 25600, maxSpeckleSize_, maxSpeckleDiff_);
+          image_depth_.image.convertTo(image_depth_.image, CV_32FC1);
+          image_depth_.image = disp2depth_const_[i] / image_depth_.image;
+          image_depth_.image.setTo(25600, image_depth_.image < 0.5);
+          //cv::imshow("final", image_depth_.image);
+          image_depth_.header.frame_id = "cam" + std::to_string(i) + "_left";
+          image_depth_.header.stamp = timestamp;
+          image_depth_.header.seq = data->frame_index;
+          image_depth_.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
+
+          sensor_msgs::CameraInfoPtr ci_depth(
+              new sensor_msgs::CameraInfo(depth_cam_info_man[i]->getCameraInfo()));
+
+          ci_depth->header.stamp = image_depth_.header.stamp;
+          ci_depth->header.frame_id = image_depth_.header.frame_id;
+          ci_depth->header.seq = data->frame_index;
+          depth_image_pub_[i]->publish(image_depth_.toImageMsg(), ci_depth);
+        }
+      }
     }
     if (data->m_greyscale_image_right[i] != NULL) {
       memcpy(image_right_.image.data, data->m_greyscale_image_right[i],
@@ -310,6 +378,32 @@ void GuidanceManager::image_handler(int data_len, char *content, ros::Time times
       ci_right->header.frame_id = image_right_.header.frame_id;
       ci_right->header.seq = data->frame_index;
       right_image_pub_[i]->publish(image_right_.toImageMsg(), ci_right);
+      if(config.isSoftDepthEnabled(i)) {
+        // image_right_.image.convertTo(image_gpubm_buf_right_[i].image, CV_32FC1);
+        image_gpubm_buf_right_[i] = image_right_;
+        if(sbm_idx_[i] < data->frame_index) {
+          sbm_idx_[i] = data->frame_index;
+        } else if(sbm_idx_[i] == data->frame_index) {
+          gpuBM(i);
+          cv::filterSpeckles(image_depth_.image, 25600, maxSpeckleSize_, maxSpeckleDiff_);
+          image_depth_.image.convertTo(image_depth_.image, CV_32FC1);
+          //cv::imshow("final", image_depth_.image);
+          image_depth_.image.setTo(25600, image_depth_.image < 0.5);
+          image_depth_.header.frame_id = "cam" + std::to_string(i) + "_left";
+          image_depth_.header.stamp = timestamp;
+          image_depth_.header.seq = data->frame_index;
+          image_depth_.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
+
+          sensor_msgs::CameraInfoPtr ci_depth(
+              new sensor_msgs::CameraInfo(depth_cam_info_man[i]->getCameraInfo()));
+
+          ci_depth->header.stamp = image_depth_.header.stamp;
+          ci_depth->header.frame_id = image_depth_.header.frame_id;
+          ci_depth->header.seq = data->frame_index;
+          depth_image_pub_[i]->publish(image_depth_.toImageMsg(), ci_depth);
+
+        }
+      }
     }
     if (data->m_depth_image[i] != NULL) {
       // 16 bit signed images, omitting processing here
@@ -319,7 +413,7 @@ void GuidanceManager::image_handler(int data_len, char *content, ros::Time times
       mat_depth16_.convertTo(mat_depth16_, CV_32FC1);
       //cv::medianBlur(mat_depth16_, mat_depth16_, 3);
       image_depth_.image = mat_depth16_ / 128.0;
-      image_depth_.image.setTo(25600, image_depth_.image < 0.3);
+      image_depth_.image.setTo(25600, image_depth_.image < 0.5);
       image_depth_.header.frame_id = "cam" + std::to_string(i) + "_left";
       image_depth_.header.stamp = timestamp;
       image_depth_.header.seq = data->frame_index;
@@ -334,7 +428,7 @@ void GuidanceManager::image_handler(int data_len, char *content, ros::Time times
       depth_image_pub_[i]->publish(image_depth_.toImageMsg(), ci_depth);
       mat_depth16_.convertTo(mat_depth16_, CV_16SC1);
     }
-    if (data->m_disparity_image[i] != NULL) {
+    if (data->m_disparity_image[i] != NULL) {/*
       memcpy(image_cv_disparity16_.image.data, data->m_disparity_image[i],
              IMG_SIZE * 2);
       //image_cv_disparity16_.image.convertTo(image_cv_disparity32_.image, CV_32FC1);
@@ -345,7 +439,7 @@ void GuidanceManager::image_handler(int data_len, char *content, ros::Time times
       image_disparity_.image.encoding = sensor_msgs::image_encodings::TYPE_16SC1;
       image_disparity_.f = calibration_params[i].focal;
       image_disparity_.T = calibration_params[i].baseline;
-      disparity_image_pub_[i].publish(image_disparity_);
+      disparity_image_pub_[i].publish(image_disparity_);*/
     }
   }
 }

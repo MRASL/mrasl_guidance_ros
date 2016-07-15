@@ -17,22 +17,28 @@ void GuidanceConfiguration::applyFromNodeHandle(ros::NodeHandle nh) {
   nh.getParam("camera_bottom/enable_depth", depth_enabled_[bottom]);
 
   nh.getParam("camera_front/enable_disparity", disparity_enabled_[front]);
-  nh.getParam("camera_left/enable_disparity", disparity_enabled_[right]);
+  nh.getParam("camera_left/enable_disparity", disparity_enabled_[left]);
   nh.getParam("camera_back/enable_disparity", disparity_enabled_[back]);
-  nh.getParam("camera_right/enable_disparity", disparity_enabled_[left]);
+  nh.getParam("camera_right/enable_disparity", disparity_enabled_[right]);
   nh.getParam("camera_bottom/enable_disparity", disparity_enabled_[bottom]);
 
   nh.getParam("camera_front/enable_left", cam_enabled_[front][cam_left]);
-  nh.getParam("camera_left/enable_left", cam_enabled_[right][cam_left]);
+  nh.getParam("camera_left/enable_left", cam_enabled_[left][cam_left]);
   nh.getParam("camera_back/enable_left", cam_enabled_[back][cam_left]);
-  nh.getParam("camera_right/enable_left", cam_enabled_[left][cam_left]);
+  nh.getParam("camera_right/enable_left", cam_enabled_[right][cam_left]);
   nh.getParam("camera_bottom/enable_left", cam_enabled_[bottom][cam_left]);
 
   nh.getParam("camera_front/enable_right", cam_enabled_[front][cam_right]);
-  nh.getParam("camera_left/enable_right", cam_enabled_[right][cam_right]);
+  nh.getParam("camera_left/enable_right", cam_enabled_[left][cam_right]);
   nh.getParam("camera_back/enable_right", cam_enabled_[back][cam_right]);
-  nh.getParam("camera_right/enable_right", cam_enabled_[left][cam_right]);
+  nh.getParam("camera_right/enable_right", cam_enabled_[right][cam_right]);
   nh.getParam("camera_bottom/enable_right", cam_enabled_[bottom][cam_right]);
+
+  nh.getParam("camera_front/enable_soft_depth", soft_depth_[front]);
+  nh.getParam("camera_left/enable_soft_depth", soft_depth_[left]);
+  nh.getParam("camera_back/enable_soft_depth", soft_depth_[back]);
+  nh.getParam("camera_right/enable_soft_depth", soft_depth_[right]);
+  nh.getParam("camera_bottom/enable_soft_depth", soft_depth_[bottom]);
 }
 
 void GuidanceConfiguration::applyConfig(guidance::guidanceConfig config) {
