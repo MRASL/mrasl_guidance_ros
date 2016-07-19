@@ -39,17 +39,19 @@ int guidance_data_rcvd_cb(int event, int data_len, char *content);
 }
 
 GuidanceManager::GuidanceManager() :
-  gpu_left_(IMG_HEIGHT, IMG_WIDTH, CV_8U),
-  gpu_right_(IMG_HEIGHT, IMG_WIDTH, CV_8U),
-  gpu_depth_(IMG_HEIGHT, IMG_WIDTH, CV_8U),
-  gpu_buf_(IMG_HEIGHT, IMG_WIDTH, CV_8U),
+  gpu_left_(IMG_HEIGHT, IMG_WIDTH, CV_8UC1),
+  gpu_right_(IMG_HEIGHT, IMG_WIDTH, CV_8UC1),
+  gpu_depth_(IMG_HEIGHT, IMG_WIDTH, CV_8UC1),
+  gpu_buf_(IMG_HEIGHT, IMG_WIDTH, CV_8UC1),
   gpu_buf16_(IMG_HEIGHT, IMG_WIDTH, CV_16SC1)
 {
 
 }
 
 e_sdk_err_code GuidanceManager::init(ros::NodeHandle pnh){
-  sbm = new cv::gpu::StereoBM_GPU(cv::StereoBM::BASIC_PRESET, 64, 15);
+  sbm = new cv::gpu::StereoBM_GPU(cv::StereoBM::BASIC_PRESET, 72, 21);
+  sbm_cpu = new cv::StereoBM(64, 9);
+  //dbf = new cv::gpu::DisparityBilateralFilter();
   pnh_ = pnh;
   config.applyFromNodeHandle(pnh_);
   it_ = new image_transport::ImageTransport(pnh_);
@@ -111,6 +113,25 @@ e_sdk_err_code GuidanceManager::init(ros::NodeHandle pnh){
       << '\t' << calibration_params[i].focal << '\t'
       << calibration_params[i].baseline << std::endl;
     disp2depth_const_[i] = calibration_params[i].baseline * calibration_params[i].focal;
+    // sanity check
+    /*if (calibration_params[i].baseline != 0.0) {
+      Q[i].at<double>(0, 0) = 1.0;
+      Q[i].at<double>(0, 1) = 0.0;
+      Q[i].at<double>(0, 2) = 0.0;
+      Q[i].at<double>(0, 3) = -calibration_params[i].cu; // -cx
+      Q[i].at<double>(1, 0) = 0.0;
+      Q[i].at<double>(1, 1) = 1.0;
+      Q[i].at<double>(1, 2) = 0.0;
+      Q[i].at<double>(1, 3) = -calibration_params[i].cv; // -cy
+      Q[i].at<double>(2, 0) = 0.0;
+      Q[i].at<double>(2, 1) = 0.0;
+      Q[i].at<double>(2, 2) = 0.0;
+      Q[i].at<double>(2, 3) = calibration_params[i].focal; // f (focal)
+      Q[i].at<double>(3, 0) = 0.0;
+      Q[i].at<double>(3, 1) = 0.0;
+      Q[i].at<double>(3, 2) = -1 / calibration_params[i].baseline; // -1/Tx
+      Q[i].at<double>(3, 3) = 0.0; // (cx - cx')/Tx lets suppose its 0 I guess...
+      }*/
   }
 
   // init multi-publishers and select data at the same time
@@ -153,7 +174,7 @@ e_sdk_err_code GuidanceManager::init(ros::NodeHandle pnh){
     if (config.isDisparityEnabled(i)) {
       disparity_image_pub_[i] = pnh_.advertise<stereo_msgs::DisparityImage>(
           "cam" + std::to_string(i) + "/left/disparity", 1);
-      std::cout << "select disp" << std::endl;
+      ROS_INFO("select disp");
       select_disparity_image(static_cast<e_vbus_index>(i));
     }
 
@@ -290,15 +311,22 @@ void GuidanceManager::gpuBM(unsigned int index) {
   gpu_left_.upload(image_gpubm_buf_left_[index].image);
   gpu_right_.upload(image_gpubm_buf_right_[index].image);
   (*sbm)(gpu_left_, gpu_right_, gpu_buf_);
-  gpu_buf_.convertTo(gpu_buf16_, CV_16S);
- // cv::gpu::divide(gpu_buf16_, disp2depth_const_[index], gpu_buf16_);
+  //(*dbf)(gpu_buf_, gpu_left_, gpu_right_);
+  gpu_buf_.convertTo(gpu_buf16_, CV_16SC1);
+  //cv::gpu::divide(gpu_buf16_, disp2depth_const_[index], gpu_buf16_);
   gpu_buf16_.download(image_depth_.image);
- /*
+  cv::filterSpeckles(image_depth_.image, 25600, 400, 
+              0.0);
+	image_depth_.image.convertTo(image_depth_.image, CV_32FC1);
+	image_depth_.image = (disp2depth_const_[index]) / image_depth_.image;
+	image_depth_.header.frame_id = "cam" + std::to_string(index) + "_left";
+	image_depth_.image.setTo(25600, image_depth_.image < 0.5);
+/*
   cv::Mat disp(image_gpubm_buf_left_[index].image.size(), CV_16S);
   gpu_buf16_.download(disp);
   image_depth_.image.convertTo(image_depth_.image, CV_16SC1);
-  cv::imshow("left", image_gpubm_buf_left_[index].image);
-  cv::imshow("right", image_gpubm_buf_right_[index].image);
+  //  cv::imshow("left", image_gpubm_buf_left_[index].image);
+  //  cv::imshow("right", image_gpubm_buf_right_[index].image);
   double min;
   double max;
   cv::minMaxIdx(disp, &min, &max);
@@ -337,19 +365,12 @@ void GuidanceManager::image_handler(int data_len, char *content, ros::Time times
       ci_left->header.frame_id = "cam" + std::to_string(i) + "_left";
 
       left_image_pub_[i]->publish(image_left_.toImageMsg(), ci_left);
-      if(config.isSoftDepthEnabled(i)) {
-       //image_left_.image.convertTo(image_gpubm_buf_left_[i].image, CV_32FC1);       
-       image_gpubm_buf_left_[i] = image_left_;
-       if(sbm_idx_[i] < data->frame_index) {
+      if(config.isSoftDepthEnabled(i)) {  
+        image_gpubm_buf_left_[i] = image_left_;
+        if(sbm_idx_[i] < data->frame_index) {
           sbm_idx_[i] = data->frame_index;
         } else if(sbm_idx_[i] == data->frame_index) {
           gpuBM(i);
-          cv::filterSpeckles(image_depth_.image, 25600, maxSpeckleSize_, maxSpeckleDiff_);
-          image_depth_.image.convertTo(image_depth_.image, CV_32FC1);
-          image_depth_.image = disp2depth_const_[i] / image_depth_.image;
-          image_depth_.image.setTo(25600, image_depth_.image < 0.5);
-          //cv::imshow("final", image_depth_.image);
-          image_depth_.header.frame_id = "cam" + std::to_string(i) + "_left";
           image_depth_.header.stamp = timestamp;
           image_depth_.header.seq = data->frame_index;
           image_depth_.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
@@ -366,7 +387,7 @@ void GuidanceManager::image_handler(int data_len, char *content, ros::Time times
     }
     if (data->m_greyscale_image_right[i] != NULL) {
       memcpy(image_right_.image.data, data->m_greyscale_image_right[i],
-             IMG_SIZE);
+          IMG_SIZE);
       image_right_.header.frame_id = "cam" + std::to_string(i) + "_right";
       image_right_.header.stamp = timestamp;
       image_right_.header.seq = data->frame_index;
@@ -379,17 +400,11 @@ void GuidanceManager::image_handler(int data_len, char *content, ros::Time times
       ci_right->header.seq = data->frame_index;
       right_image_pub_[i]->publish(image_right_.toImageMsg(), ci_right);
       if(config.isSoftDepthEnabled(i)) {
-        // image_right_.image.convertTo(image_gpubm_buf_right_[i].image, CV_32FC1);
         image_gpubm_buf_right_[i] = image_right_;
         if(sbm_idx_[i] < data->frame_index) {
           sbm_idx_[i] = data->frame_index;
         } else if(sbm_idx_[i] == data->frame_index) {
           gpuBM(i);
-          cv::filterSpeckles(image_depth_.image, 25600, maxSpeckleSize_, maxSpeckleDiff_);
-          image_depth_.image.convertTo(image_depth_.image, CV_32FC1);
-          //cv::imshow("final", image_depth_.image);
-          image_depth_.image.setTo(25600, image_depth_.image < 0.5);
-          image_depth_.header.frame_id = "cam" + std::to_string(i) + "_left";
           image_depth_.header.stamp = timestamp;
           image_depth_.header.seq = data->frame_index;
           image_depth_.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
@@ -429,8 +444,8 @@ void GuidanceManager::image_handler(int data_len, char *content, ros::Time times
       mat_depth16_.convertTo(mat_depth16_, CV_16SC1);
     }
     if (data->m_disparity_image[i] != NULL) {/*
-      memcpy(image_cv_disparity16_.image.data, data->m_disparity_image[i],
-             IMG_SIZE * 2);
+                                                memcpy(image_cv_disparity16_.image.data, data->m_disparity_image[i],
+                                                IMG_SIZE * 2);
       //image_cv_disparity16_.image.convertTo(image_cv_disparity32_.image, CV_32FC1);
       image_disparity_.image = *image_cv_disparity16_.toImageMsg();
       image_disparity_.header.frame_id = "cam" + std::to_string(i) + "_left";

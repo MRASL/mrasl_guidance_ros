@@ -97,7 +97,8 @@ class GuidanceManager {
   void operator=(GuidanceManager const &);
 
   // Camera stuff
-  stereo_cali calibration_params[5];
+  stereo_cali calibration_params[CAMERA_PAIR_NUM];
+  cv::Mat Q[CAMERA_PAIR_NUM];
   camera_info_manager::CameraInfoManager *right_cam_info_man[CAMERA_PAIR_NUM];
   camera_info_manager::CameraInfoManager *left_cam_info_man[CAMERA_PAIR_NUM];
   camera_info_manager::CameraInfoManager *depth_cam_info_man[CAMERA_PAIR_NUM];
@@ -140,6 +141,8 @@ class GuidanceManager {
   int maxSpeckleSize_;
   double maxSpeckleDiff_;
   cv::gpu::StereoBM_GPU* sbm;
+  cv::StereoBM* sbm_cpu;
+  //cv::gpu::DisparityBilateralFilter* dbf;
   cv::gpu::GpuMat gpu_left_, gpu_right_, gpu_depth_, gpu_buf_, gpu_buf16_;
   unsigned int sbm_idx_[CAMERA_PAIR_NUM]; // this contains the last frame_index rcvd for a certain cam pair
   double disp2depth_const_[CAMERA_PAIR_NUM];
