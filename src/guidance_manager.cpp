@@ -38,22 +38,22 @@ int guidance_data_rcvd_cb(int event, int data_len, char *content);
   }                                                                          \
 }
 
-GuidanceManager::GuidanceManager() :
+GuidanceManager::GuidanceManager()/* :
   gpu_left_(IMG_HEIGHT, IMG_WIDTH, CV_8UC1),
   gpu_right_(IMG_HEIGHT, IMG_WIDTH, CV_8UC1),
   gpu_depth_(IMG_HEIGHT, IMG_WIDTH, CV_8UC1),
   gpu_buf_(IMG_HEIGHT, IMG_WIDTH, CV_8UC1),
-  gpu_buf16_(IMG_HEIGHT, IMG_WIDTH, CV_16SC1)
+  gpu_buf16_(IMG_HEIGHT, IMG_WIDTH, CV_16SC1)*/
 {
 
 }
 
 e_sdk_err_code GuidanceManager::init(ros::NodeHandle pnh){
-  //sbm = new cv::gpu::StereoBM_GPU(cv::StereoBM::BASIC_PRESET, 72, 21);
+  /*sbm = new cv::gpu::StereoBM_GPU(cv::StereoBM::BASIC_PRESET, 72, 21);
   int ndisp, iters, levels, nr_plane;
   cv::gpu::StereoConstantSpaceBP::estimateRecommendedParams(IMG_WIDTH, IMG_HEIGHT, ndisp, iters, levels, nr_plane);
   ROS_INFO("Stereo CSBP params: ndisp %d, iters %d, levels %d, nr_plane %d", ndisp, iters, levels, nr_plane);
-  sbm = new cv::gpu::StereoConstantSpaceBP(ndisp, iters, levels, nr_plane, CV_16SC1);
+  sbm = new cv::gpu::StereoConstantSpaceBP(ndisp, iters, levels, nr_plane, CV_16SC1);*/
   sbm_cpu = new cv::StereoBM(cv::StereoBM::BASIC_PRESET, 64, 21);
   //dbf = new cv::gpu::DisparityBilateralFilter();
   pnh_ = pnh;
@@ -322,10 +322,10 @@ void GuidanceManager::gpuBM(unsigned int index) {
   //gpu_buf_.convertTo(gpu_buf16_, CV_16SC1);
   //cv::gpu::divide(gpu_buf16_, disp2depth_const_[index], gpu_buf16_);
   //gpu_buf16_.download(image_depth_.image);
-  (*sbm_cpu)(image_gpubm_buf_left_[index].image, image_gpubm_buf_right_[index].image,
-    image_depth_.image);
-  cv::filterSpeckles(image_depth_.image, 25600, 400, 
-              0.0);
+  (*sbm_cpu)( image_gpubm_buf_left_[index].image,
+              image_gpubm_buf_right_[index].image,
+              image_depth_.image);
+  cv::filterSpeckles(image_depth_.image, 25600, maxSpeckleSize_, maxSpeckleDiff_);
 	//image_depth_.image.convertTo(image_depth_.image, CV_32FC1);
 	image_depth_.image = (disp2depth_const_[index] * 16000) / image_depth_.image;
 	image_depth_.header.frame_id = "cam" + std::to_string(index) + "_left";
@@ -357,7 +357,6 @@ e_sdk_err_code GuidanceManager::configureGuidance(void) {
   RETURN_IF_ERR(err_code);
 }
 
-cv::Mat depth8(IMG_HEIGHT, IMG_WIDTH, CV_8UC1);
 void GuidanceManager::image_handler(int data_len, char *content, ros::Time timestamp) {
   // Figure out what kind of image this is and which camera it came from
   image_data *data = (image_data *)content;
@@ -376,7 +375,7 @@ void GuidanceManager::image_handler(int data_len, char *content, ros::Time times
       ci_left->header.frame_id = "cam" + std::to_string(i) + "_left";
 
       left_image_pub_[i]->publish(image_left_.toImageMsg(), ci_left);
-      if(config.isSoftDepthEnabled(i)) {  
+      if(config.isSoftDepthEnabled(i)) {
         image_gpubm_buf_left_[i] = image_left_;
         if(sbm_idx_[i] < data->frame_index) {
           sbm_idx_[i] = data->frame_index;
@@ -453,8 +452,9 @@ void GuidanceManager::image_handler(int data_len, char *content, ros::Time times
       mat_depth16_.convertTo(mat_depth16_, CV_16SC1);
     }
     if (data->m_disparity_image[i] != NULL) {/*
-                                                memcpy(image_cv_disparity16_.image.data, data->m_disparity_image[i],
-                                                IMG_SIZE * 2);
+      something is broken with the disparity but I don't have time to fix it
+      memcpy(image_cv_disparity16_.image.data, data->m_disparity_image[i],
+      IMG_SIZE * 2);
       //image_cv_disparity16_.image.convertTo(image_cv_disparity32_.image, CV_32FC1);
       image_disparity_.image = *image_cv_disparity16_.toImageMsg();
       image_disparity_.header.frame_id = "cam" + std::to_string(i) + "_left";
@@ -513,22 +513,6 @@ void GuidanceManager::motion_handler(int data_len, char *content, ros::Time time
   twist_global_msg_.twist.linear.y = m->velocity_in_global_y;
   twist_global_msg_.twist.linear.z = m->velocity_in_global_z;
   velocity_global_pub_.publish(twist_global_msg_);
-  /*
-     static tf2_ros::TransformBroadcaster br;
-     geometry_msgs::TransformStamped transformStamped;
-
-     transformStamped.header.stamp = ros::Time::now();
-     transformStamped.header.frame_id = "world";
-     transformStamped.child_frame_id = "guidance";
-     transformStamped.transform.translation.x = m->position_in_global_x;
-     transformStamped.transform.translation.y = m->position_in_global_y;
-     transformStamped.transform.translation.z = m->position_in_global_z;
-     transformStamped.transform.rotation.x = m->q1;
-     transformStamped.transform.rotation.y = m->q2;
-     transformStamped.transform.rotation.z = m->q3;
-     transformStamped.transform.rotation.w = m->q0;
-
-     br.sendTransform(transformStamped);*/
 }
 
 void GuidanceManager::velocity_handler(int data_len, char *content, ros::Time timestamp) {

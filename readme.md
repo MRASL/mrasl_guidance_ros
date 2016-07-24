@@ -28,9 +28,10 @@ For some odd reason, DJI decided not to let us request the camera intrinsics but
 Note that depth images are provided in the left camera reference frame, that's why there's a missing piece of image on the left of depth images.
 * `cam[i]`
 
+## GPU usage
+Seems like the GPU based stereo block matching is too imprecise. So 1 pair is
+CPU block matched.
+
 # Future work
-* Add services to programatically enable or disable streams
 * Actually use dynamic reconfigure
 * Make this a nodelet somehow
-* Add depth map filtering
-* Add

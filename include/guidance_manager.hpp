@@ -129,7 +129,7 @@ class GuidanceManager {
    * @param index         Camera index of the guidance
    */
   void gpuBM(unsigned int index);
-  
+
   /**
    * Apply a configuration to the Guidance
    */
@@ -140,10 +140,9 @@ class GuidanceManager {
   // image processing stuff
   int maxSpeckleSize_;
   double maxSpeckleDiff_;
-  cv::gpu::StereoConstantSpaceBP* sbm;
   cv::StereoBM* sbm_cpu;
-  //cv::gpu::DisparityBilateralFilter* dbf;
-  cv::gpu::GpuMat gpu_left_, gpu_right_, gpu_depth_, gpu_buf_, gpu_buf16_;
+  /*cv::gpu::StereoConstantSpaceBP* sbm;
+  cv::gpu::GpuMat gpu_left_, gpu_right_, gpu_depth_, gpu_buf_, gpu_buf16_;*/
   unsigned int sbm_idx_[CAMERA_PAIR_NUM]; // this contains the last frame_index rcvd for a certain cam pair
   double disp2depth_const_[CAMERA_PAIR_NUM];
 

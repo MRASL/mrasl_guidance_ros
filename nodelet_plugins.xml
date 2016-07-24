@@ -1,0 +1,8 @@
+<library path="lib/libGuidanceNodelet">
+  <class name="mrasl_guidance/GuidanceNodelet" type="mrasl_guidance::GuidanceNodelet"
+    base_class_type="nodelet::Nodelet">
+  <description>
+  The guidance manager nodelet.
+  </description>
+  </class>
+</library>
