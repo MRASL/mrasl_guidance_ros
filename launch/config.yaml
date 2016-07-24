@@ -73,7 +73,7 @@ camera_left:
   orientation: {x: 0.0, y: 0.0, z: 0.0, w: 0.0}
 
 enable_imu: true
-enable_utrasonic: false
+enable_utrasonic: true
 enable_obstacle_distance: false
 enable_velocity: false
 enable_motion: false

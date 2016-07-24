@@ -49,8 +49,12 @@ GuidanceManager::GuidanceManager() :
 }
 
 e_sdk_err_code GuidanceManager::init(ros::NodeHandle pnh){
-  sbm = new cv::gpu::StereoBM_GPU(cv::StereoBM::BASIC_PRESET, 72, 21);
-  sbm_cpu = new cv::StereoBM(64, 9);
+  //sbm = new cv::gpu::StereoBM_GPU(cv::StereoBM::BASIC_PRESET, 72, 21);
+  int ndisp, iters, levels, nr_plane;
+  cv::gpu::StereoConstantSpaceBP::estimateRecommendedParams(IMG_WIDTH, IMG_HEIGHT, ndisp, iters, levels, nr_plane);
+  ROS_INFO("Stereo CSBP params: ndisp %d, iters %d, levels %d, nr_plane %d", ndisp, iters, levels, nr_plane);
+  sbm = new cv::gpu::StereoConstantSpaceBP(ndisp, iters, levels, nr_plane, CV_16SC1);
+  sbm_cpu = new cv::StereoBM(cv::StereoBM::BASIC_PRESET, 64, 21);
   //dbf = new cv::gpu::DisparityBilateralFilter();
   pnh_ = pnh;
   config.applyFromNodeHandle(pnh_);
@@ -222,6 +226,9 @@ e_sdk_err_code GuidanceManager::init(ros::NodeHandle pnh){
     static_cast<e_sdk_err_code>(set_sdk_event_handler(guidance_data_rcvd_cb));
   RETURN_IF_ERR(err_code);
 
+  ROS_WARN("Set cameras to 10 Hz");
+  set_image_frequecy(e_frequecy_10);
+
   std::cout << "start transfer" << std::endl;
   err_code = static_cast<e_sdk_err_code>(start_transfer());
   RETURN_IF_ERR(err_code);
@@ -308,19 +315,23 @@ void GuidanceManager::createImagePublisher(ros::NodeHandle nh,
 }
 
 void GuidanceManager::gpuBM(unsigned int index) {
-  gpu_left_.upload(image_gpubm_buf_left_[index].image);
-  gpu_right_.upload(image_gpubm_buf_right_[index].image);
-  (*sbm)(gpu_left_, gpu_right_, gpu_buf_);
+  //gpu_left_.upload(image_gpubm_buf_left_[index].image);
+  //gpu_right_.upload(image_gpubm_buf_right_[index].image);
+  //(*sbm)(gpu_left_, gpu_right_, gpu_buf16_);
   //(*dbf)(gpu_buf_, gpu_left_, gpu_right_);
-  gpu_buf_.convertTo(gpu_buf16_, CV_16SC1);
+  //gpu_buf_.convertTo(gpu_buf16_, CV_16SC1);
   //cv::gpu::divide(gpu_buf16_, disp2depth_const_[index], gpu_buf16_);
-  gpu_buf16_.download(image_depth_.image);
+  //gpu_buf16_.download(image_depth_.image);
+  (*sbm_cpu)(image_gpubm_buf_left_[index].image, image_gpubm_buf_right_[index].image,
+    image_depth_.image);
   cv::filterSpeckles(image_depth_.image, 25600, 400, 
               0.0);
-	image_depth_.image.convertTo(image_depth_.image, CV_32FC1);
-	image_depth_.image = (disp2depth_const_[index]) / image_depth_.image;
+	//image_depth_.image.convertTo(image_depth_.image, CV_32FC1);
+	image_depth_.image = (disp2depth_const_[index] * 16000) / image_depth_.image;
 	image_depth_.header.frame_id = "cam" + std::to_string(index) + "_left";
 	image_depth_.image.setTo(25600, image_depth_.image < 0.5);
+  image_depth_.encoding = sensor_msgs::image_encodings::TYPE_16SC1;
+
 /*
   cv::Mat disp(image_gpubm_buf_left_[index].image.size(), CV_16S);
   gpu_buf16_.download(disp);
@@ -373,7 +384,6 @@ void GuidanceManager::image_handler(int data_len, char *content, ros::Time times
           gpuBM(i);
           image_depth_.header.stamp = timestamp;
           image_depth_.header.seq = data->frame_index;
-          image_depth_.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
 
           sensor_msgs::CameraInfoPtr ci_depth(
               new sensor_msgs::CameraInfo(depth_cam_info_man[i]->getCameraInfo()));
@@ -407,7 +417,6 @@ void GuidanceManager::image_handler(int data_len, char *content, ros::Time times
           gpuBM(i);
           image_depth_.header.stamp = timestamp;
           image_depth_.header.seq = data->frame_index;
-          image_depth_.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
 
           sensor_msgs::CameraInfoPtr ci_depth(
               new sensor_msgs::CameraInfo(depth_cam_info_man[i]->getCameraInfo()));

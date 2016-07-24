@@ -140,7 +140,7 @@ class GuidanceManager {
   // image processing stuff
   int maxSpeckleSize_;
   double maxSpeckleDiff_;
-  cv::gpu::StereoBM_GPU* sbm;
+  cv::gpu::StereoConstantSpaceBP* sbm;
   cv::StereoBM* sbm_cpu;
   //cv::gpu::DisparityBilateralFilter* dbf;
   cv::gpu::GpuMat gpu_left_, gpu_right_, gpu_depth_, gpu_buf_, gpu_buf16_;
