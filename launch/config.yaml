@@ -29,11 +29,11 @@ camera_bottom:
   orientation: {x: 0.0, y: 0.0, z: 0.0, w: 0.0}
 
 camera_front:
-  enable_depth: true
+  enable_depth: false
   enable_disparity: false
   enable_left: true
-  enable_right: false
-  enable_soft_depth: false
+  enable_right: true
+  enable_soft_depth: true
   frame_id: "guidance"
   child_frame_id: "cam1"
   sensor_position: {x:  0.0, y:  0.0, z:  0.0} # w.r.t to guidance imu
@@ -62,11 +62,11 @@ camera_back:
   orientation: {x: 0.0, y: 0.0, z: 0.0, w: 0.0}
 
 camera_left:
-  enable_depth: false
+  enable_depth: true
   enable_disparity: false
-  enable_left: true
-  enable_right: true
-  enable_soft_depth: true
+  enable_left: false
+  enable_right: false
+  enable_soft_depth: false
   frame_id: "guidance"
   child_frame_id: "cam4"
   sensor_position: {x:  0.0, y:  0.0, z:  0.0} # w.r.t to guidance imu
