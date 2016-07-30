@@ -329,7 +329,7 @@ void GuidanceManager::gpuBM(unsigned int index) {
 	image_depth_.image.convertTo(image_depth_.image, CV_16UC1);
 	image_depth_.image = (disp2depth_const_[index] * 16000) / image_depth_.image;
 	image_depth_.header.frame_id = "cam" + std::to_string(index) + "_left";
-	image_depth_.image.setTo(25600, image_depth_.image < 0.5);
+	image_depth_.image.setTo(25600, image_depth_.image < 500);
   image_depth_.encoding = sensor_msgs::image_encodings::TYPE_16UC1;
 
 /*
