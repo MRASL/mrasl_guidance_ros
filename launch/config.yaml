@@ -42,7 +42,7 @@ camera_front:
 camera_right:
   enable_depth: true
   enable_disparity: false
-  enable_left: true
+  enable_left: false
   enable_right: false
   enable_soft_depth: false
   frame_id: "guidance"
