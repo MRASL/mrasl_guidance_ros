@@ -44,6 +44,13 @@ GuidanceManager::GuidanceManager(){
 
 e_sdk_err_code GuidanceManager::init(ros::NodeHandle pnh){
   sbm_cpu = new cv::StereoBM(cv::StereoBM::BASIC_PRESET, 64, 21);
+  sbm_cpu->state->preFilterCap = 9;
+  sbm_cpu->state->preFilterSize = 31;
+  sbm_cpu->state->minDisparity = 0;
+  sbm_cpu->state->uniquenessRatio = 15.0;
+  sbm_cpu->state->speckleWindowSize = 100;
+  sbm_cpu->state->speckleRange = 4;
+  sbm_cpu->state->textureThreshold = 10;
   pnh_ = pnh;
   config.applyFromNodeHandle(pnh_);
   it_ = new image_transport::ImageTransport(pnh_);
