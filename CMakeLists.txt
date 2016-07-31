@@ -99,21 +99,20 @@ target_link_libraries( guidance
   ${OpenCV_LIBS}
 )
 
-#add_executable(guidance_nodelet
-#  ${PROJECT_SOURCE_DIR}/src/guidance_nodelet.cpp
-#)
-#
-#add_dependencies(guidance_nodelet
-#  ${PROJECT_NAME}_gencfg
-#  ${${PROJECT_NAME}_EXPORTED_TARGETS}
-#)
-#
-#target_link_libraries( guidance_nodelet
-#  DJI_guidance
-#  usb-1.0
-#  ${catkin_LIBRARIES}
-#  ${OpenCV_LIBS}
-#)
-#
-#install(FILES nodelet_plugins.xml DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION} )
-#
+add_library(guidance_nodelet
+  ${PROJECT_SOURCE_DIR}/src/guidance_nodelet.cpp
+)
+
+add_dependencies(guidance_nodelet
+  ${PROJECT_NAME}_gencfg
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+)
+
+target_link_libraries( guidance_nodelet
+  DJI_guidance
+  usb-1.0
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBS}
+)
+
+install(FILES nodelet_plugins.xml DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION} )
