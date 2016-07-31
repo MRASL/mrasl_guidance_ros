@@ -38,24 +38,12 @@ int guidance_data_rcvd_cb(int event, int data_len, char *content);
   }                                                                          \
 }
 
-GuidanceManager::GuidanceManager()/* :
-  gpu_left_(IMG_HEIGHT, IMG_WIDTH, CV_8UC1),
-  gpu_right_(IMG_HEIGHT, IMG_WIDTH, CV_8UC1),
-  gpu_depth_(IMG_HEIGHT, IMG_WIDTH, CV_8UC1),
-  gpu_buf_(IMG_HEIGHT, IMG_WIDTH, CV_8UC1),
-  gpu_buf16_(IMG_HEIGHT, IMG_WIDTH, CV_16SC1)*/
-{
+GuidanceManager::GuidanceManager(){
 
 }
 
 e_sdk_err_code GuidanceManager::init(ros::NodeHandle pnh){
-  /*sbm = new cv::gpu::StereoBM_GPU(cv::StereoBM::BASIC_PRESET, 72, 21);
-  int ndisp, iters, levels, nr_plane;
-  cv::gpu::StereoConstantSpaceBP::estimateRecommendedParams(IMG_WIDTH, IMG_HEIGHT, ndisp, iters, levels, nr_plane);
-  ROS_INFO("Stereo CSBP params: ndisp %d, iters %d, levels %d, nr_plane %d", ndisp, iters, levels, nr_plane);
-  sbm = new cv::gpu::StereoConstantSpaceBP(ndisp, iters, levels, nr_plane, CV_16SC1);*/
   sbm_cpu = new cv::StereoBM(cv::StereoBM::BASIC_PRESET, 64, 21);
-  //dbf = new cv::gpu::DisparityBilateralFilter();
   pnh_ = pnh;
   config.applyFromNodeHandle(pnh_);
   it_ = new image_transport::ImageTransport(pnh_);
@@ -325,7 +313,7 @@ void GuidanceManager::gpuBM(unsigned int index) {
   (*sbm_cpu)( image_gpubm_buf_left_[index].image,
               image_gpubm_buf_right_[index].image,
               image_depth_.image);
-  cv::filterSpeckles(image_depth_.image, 25600, maxSpeckleSize_, maxSpeckleDiff_);
+  cv::filterSpeckles(image_depth_.image, 25600, 120, 48, speckle_buf_);
 	image_depth_.image.convertTo(image_depth_.image, CV_16UC1);
 	image_depth_.image = (disp2depth_const_[index] * 16000) / image_depth_.image;
 	image_depth_.header.frame_id = "cam" + std::to_string(index) + "_left";
@@ -432,7 +420,7 @@ void GuidanceManager::image_handler(int data_len, char *content, ros::Time times
       // 16 bit signed images, omitting processing here
       memcpy(mat_depth16_.data, data->m_depth_image[i], IMG_SIZE * 2);
 
-      cv::filterSpeckles(mat_depth16_, 25600, maxSpeckleSize_, maxSpeckleDiff_);
+      cv::filterSpeckles(mat_depth16_, 25600, maxSpeckleSize_, maxSpeckleDiff_, speckle_buf_);
       mat_depth16_.convertTo(mat_depth16_, CV_32FC1);
       //cv::medianBlur(mat_depth16_, mat_depth16_, 3);
       image_depth_.image = mat_depth16_ / 128.0;

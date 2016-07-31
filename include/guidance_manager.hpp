@@ -79,6 +79,10 @@ class GuidanceManager {
     maxSpeckleSize_ = maxSpeckleSize;
   };
   void set_maxDiff(double maxDiff) { maxSpeckleDiff_ = maxDiff; };
+  void set_maxSpeckleSizeCpu(int maxSpeckleSizeCpu) {
+    maxSpeckleSizeCpu_ = maxSpeckleSizeCpu;
+  };
+  void set_maxDiffCpu(int maxSpeckleDiffCpu) { maxSpeckleDiffCpu_ = maxSpeckleDiffCpu; };
 
  private:
 #define IMG_WIDTH 320
@@ -138,8 +142,8 @@ class GuidanceManager {
   GuidanceConfiguration config;
 
   // image processing stuff
-  int maxSpeckleSize_;
-  double maxSpeckleDiff_;
+  int maxSpeckleSize_, maxSpeckleSizeCpu_;
+  double maxSpeckleDiff_, maxSpeckleDiffCpu_;
   cv::StereoBM* sbm_cpu;
   /*cv::gpu::StereoConstantSpaceBP* sbm;
   cv::gpu::GpuMat gpu_left_, gpu_right_, gpu_depth_, gpu_buf_, gpu_buf16_;*/
@@ -152,7 +156,7 @@ class GuidanceManager {
   cv_bridge::CvImage image_depth_;
   cv_bridge::CvImage image_gpubm_buf_left_[CAMERA_PAIR_NUM];
   cv_bridge::CvImage image_gpubm_buf_right_[CAMERA_PAIR_NUM];
-  cv::Mat mat_depth16_;
+  cv::Mat mat_depth16_, speckle_buf_;
   cv_bridge::CvImage image_cv_disparity16_, image_cv_disparity32_;
   stereo_msgs::DisparityImage image_disparity_;
   sensor_msgs::Range ultrasonic_msg_;

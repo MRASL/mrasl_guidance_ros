@@ -19,6 +19,8 @@ void signal_handler(int signal) {
 void config_callback(guidance::guidanceConfig &config, uint32_t level) {
   GuidanceManager::getInstance()->set_maxDiff(config.maxDiff);
   GuidanceManager::getInstance()->set_maxSpeckleSize(config.maxSpeckleSize);
+  GuidanceManager::getInstance()->set_maxDiffCpu(config.maxDiffCpu);
+  GuidanceManager::getInstance()->set_maxSpeckleSize(config.maxSpeckleSizeCpu);
 }
 
 int main(int argc, char *argv[]) {
