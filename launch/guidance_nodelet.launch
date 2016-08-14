@@ -1,0 +1,12 @@
+<launch>
+  <arg name="manager" default="manager" />
+  <arg name="output" default="screen" />
+  <arg name="plugin" default="false" /> <!-- Whether or not to load into an existing manager -->
+  <arg unless="$(arg plugin)" name="option" value="standalone mrasl_guidance/guidance_nodelet" />
+  <arg if="$(arg plugin)" name="option" value="load mrasl_guidance/guidance_nodelet $(arg manager)" />
+
+  <node pkg="nodelet" type="nodelet" name="guidance"
+    args="$(arg option)" output="$(arg output)">
+    <rosparam command="load" file="$(find mrasl_guidance)/launch/config.yaml" />
+  </node>
+</launch>
