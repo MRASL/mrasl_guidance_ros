@@ -234,6 +234,7 @@ e_sdk_err_code GuidanceManager::init(ros::NodeHandle pnh){
 void GuidanceManager::stopTransfer() {
   std::lock_guard<std::mutex> guard(g_guidance_mutex);
   stop_transfer();
+  ros::Duration(1.0).sleep(); // make sure ack packet received
 }
 
 void GuidanceManager::releaseTransfer() {
