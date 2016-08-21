@@ -28,6 +28,7 @@
   <depend>camera_info_manager</depend>
   <depend>message_generation</depend>
   <depend>message_runtime</depend>
+  <depend>mrasl</depend>
 
   <export>
     <nodelet plugin="${prefix}/nodelet_plugin.xml" />

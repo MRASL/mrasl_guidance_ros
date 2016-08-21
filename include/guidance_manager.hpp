@@ -78,11 +78,11 @@ class GuidanceManager {
   void set_maxSpeckleSize(int maxSpeckleSize) {
     maxSpeckleSize_ = maxSpeckleSize;
   };
-  void set_maxDiff(double maxDiff) { maxSpeckleDiff_ = maxDiff; };
+  void set_maxDiff(double maxDiff) { maxSpeckleDiff_ = maxDiff; }
   void set_maxSpeckleSizeCpu(int maxSpeckleSizeCpu) {
     maxSpeckleSizeCpu_ = maxSpeckleSizeCpu;
   };
-  void set_maxDiffCpu(int maxSpeckleDiffCpu) { maxSpeckleDiffCpu_ = maxSpeckleDiffCpu; };
+  void set_maxDiffCpu(int maxSpeckleDiffCpu) { maxSpeckleDiffCpu_ = maxSpeckleDiffCpu; }
 
  private:
 #define IMG_WIDTH 320

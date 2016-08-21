@@ -25,6 +25,7 @@ find_package(catkin REQUIRED COMPONENTS
   tf2
   tf2_ros
   message_generation
+  mrasl
 )
 
 find_package(OpenCV REQUIRED)
@@ -51,6 +52,7 @@ catkin_package(
                   tf2
                   tf2_ros
                   message_generation
+                  mrasl
 )
 
 include_directories(
