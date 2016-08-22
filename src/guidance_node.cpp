@@ -16,6 +16,23 @@
 GuidanceManager *GuidanceManager::s_instance_ = 0;
 ros::ServiceClient mission_planner_client;
 
+ros::Timer * shutdown_timer;
+
+
+void shutdown_timerCallback(const ros::TimerEvent&){
+  ROS_WARN("Received Kill Signal.");
+
+  mrasl::UpdateNodeStatus srv;
+  srv.request.node_ID = mrasl::node_ID::GUIDANCE;
+  srv.request.node_status = mrasl::node_status::STATUS_STOP;
+  if(!mission_planner_client.call(srv))
+  {
+    ROS_ERROR("Unable to contact mission planner.");
+  }
+
+  ros::shutdown();
+}
+
 void signal_handler(int signal) {
   GuidanceManager::getInstance()->stopTransfer();
   std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -23,7 +40,10 @@ void signal_handler(int signal) {
   mrasl::UpdateNodeStatus srv;
   srv.request.node_ID = mrasl::node_ID::GUIDANCE;
   srv.request.node_status = mrasl::node_status::STATUS_STOP;
-  mission_planner_client.call(srv);
+  if(!mission_planner_client.call(srv))
+  {
+    ROS_ERROR("Unable to contact mission planner.");
+  }
   ros::shutdown();
 }
 
@@ -44,7 +64,8 @@ bool missionPlannerCallback(mrasl::MissionPlannerRequest::Request &req,
         GuidanceManager::getInstance()->stopTransfer();
 
         GuidanceManager::getInstance()->releaseTransfer();
-        ros::shutdown();
+        shutdown_timer->setPeriod(ros::Duration(2.0),true);
+        shutdown_timer->start();
     }
 }
 
@@ -52,6 +73,8 @@ int main(int argc, char *argv[]) {
   ros::init(argc, argv, "guidance_node", ros::init_options::NoSigintHandler);
   std::signal(SIGINT, signal_handler);
   ros::NodeHandle nh("~");
+
+  shutdown_timer = new ros::Timer(nh.createTimer(ros::Duration(2.0),shutdown_timerCallback,true,false));
 
   mission_planner_client = nh.serviceClient<mrasl::UpdateNodeStatus>("/mission_main/update_node_status");
   dynamic_reconfigure::Server<guidance::guidanceConfig> server;
