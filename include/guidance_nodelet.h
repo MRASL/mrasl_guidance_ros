@@ -1,3 +1,5 @@
+#ifndef GUIDANCE_NODELET_H
+#define GUIDANCE_NODELET_H
 #include <csignal>
 
 #include <ros/ros.h>
@@ -13,6 +15,10 @@ namespace mrasl_guidance
   public:
     virtual void onInit();
   private:
-    
+
   };
 }
+
+PLUGINLIB_EXPORT_CLASS(mrasl_guidance::GuidanceNodelet, nodelet::Nodelet);
+
+#endif // GUIDANCE_NODELET_H

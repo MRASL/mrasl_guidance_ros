@@ -26,6 +26,7 @@ find_package(catkin REQUIRED COMPONENTS
   tf2_ros
   message_generation
   mrasl
+  nodelet
 )
 
 find_package(OpenCV REQUIRED)
@@ -41,6 +42,7 @@ add_service_files(
 
 catkin_package(
   INCLUDE_DIRS include
+  LIBRARIES GuidanceNodelet
   CATKIN_DEPENDS  roscpp
                   cv_bridge
                   std_msgs
@@ -53,6 +55,7 @@ catkin_package(
                   tf2_ros
                   message_generation
                   mrasl
+                  nodelet
 )
 
 include_directories(
@@ -101,14 +104,28 @@ target_link_libraries( guidance
   ${OpenCV_LIBS}
 )
 
-add_library(guidance_nodelet ${PROJECT_SOURCE_DIR}/src/guidance_nodelet.cpp)
-
-add_dependencies(guidance_nodelet ${PROJECT_NAME}_gencfg ${${PROJECT_NAME}_EXPORTED_TARGETS})
-target_link_libraries( guidance_nodelet
+add_library(GuidanceNodelet
+  ${PROJECT_SOURCE_DIR}/src/guidance_nodelet.cpp
+  ${PROJECT_SOURCE_DIR}/src/guidance_manager.cpp
+  ${PROJECT_SOURCE_DIR}/src/guidance_configuration.cpp
+  ${PROJECT_SOURCE_DIR}/src/dji/utils.cpp
+)
+target_link_libraries(GuidanceNodelet
   DJI_guidance
   usb-1.0
   ${catkin_LIBRARIES}
   ${OpenCV_LIBS}
 )
+add_dependencies(GuidanceNodelet
+  ${catkin_EXPORTED_LIBRARIES}
+  ${PROJECT_NAME}_gencfg
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+)
 
-install(FILES nodelet_plugins.xml DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION} )
+## Mark the nodelet library for installations
+install(TARGETS GuidanceNodelet
+  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+
+install(FILES nodelet_guidance.xml DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION} )

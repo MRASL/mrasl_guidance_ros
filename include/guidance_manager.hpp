@@ -3,23 +3,29 @@
 #include <map>
 
 #include <ros/ros.h>
-#include <image_transport/image_transport.h>
 #include <camera_info_manager/camera_info_manager.h>
 #include <cv_bridge/cv_bridge.h>
-#include <stereo_msgs/DisparityImage.h>
+#include <dynamic_reconfigure/server.h>
+#include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/TransformStamped.h>
+#include <geometry_msgs/TwistStamped.h>
+#include <image_transport/image_transport.h>
+#include <sensor_msgs/Imu.h>
 #include <sensor_msgs/LaserScan.h>
 #include <sensor_msgs/Range.h>
-#include <sensor_msgs/Imu.h>
-#include <geometry_msgs/TwistStamped.h>
-#include <geometry_msgs/PoseStamped.h>
-#include <tf2/LinearMath/Quaternion.h>
+#include <stereo_msgs/DisparityImage.h>
 #include <tf2_ros/transform_broadcaster.h>
-#include <geometry_msgs/TransformStamped.h>
+#include <tf2/LinearMath/Quaternion.h>
+
+#include <mrasl/MissionPlannerRequest.h>
+#include <mrasl/UpdateNodeStatus.h>
+#include <Definitions.h>
 
 #include <dji/guidance.h>
-#include "guidance_configuration.hpp"
 #include <opencv2/opencv.hpp>
 #include <opencv2/gpu/gpu.hpp>
+
+#include "guidance_configuration.hpp"
 
 /**
  * @brief The GuidanceManager class
@@ -84,6 +90,18 @@ class GuidanceManager {
   };
   void set_maxDiffCpu(int maxSpeckleDiffCpu) { maxSpeckleDiffCpu_ = maxSpeckleDiffCpu; }
 
+  /**
+   * Callback for the dynamic reconfigure
+   * @param config
+   * @param level
+   */
+  void reconfigure_callback(guidance::guidanceConfig &config, uint32_t level);
+
+  /**
+   * callback executed when remote shutdown is asked
+   * @param e Timer event
+   */
+  void shutdown_timerCallback(const ros::TimerEvent& e);
  private:
 #define IMG_WIDTH 320
 #define IMG_HEIGHT 240
@@ -95,6 +113,7 @@ class GuidanceManager {
   ros::NodeHandle disp_pnh_[CAMERA_PAIR_NUM];
   ros::NodeHandle left_pnh_[CAMERA_PAIR_NUM];
   ros::NodeHandle right_pnh_[CAMERA_PAIR_NUM];
+  ros::ServiceServer mission_planner_service;
   static GuidanceManager *s_instance_;
   GuidanceManager();  // Purposely hide the damn things
   GuidanceManager(GuidanceManager const &);
@@ -192,6 +211,15 @@ class GuidanceManager {
   } TimeStamp;
 
   std::map<unsigned int, TimeStamp> timestamp_buf_;
+
+  // mission planner interopt
+  dynamic_reconfigure::Server<guidance::guidanceConfig> reconfigure_server_;
+  dynamic_reconfigure::Server<guidance::guidanceConfig>::CallbackType reconfigure_callback_type;
+  bool missionPlannerCallback(mrasl::MissionPlannerRequest::Request &req,
+                              mrasl::MissionPlannerRequest::Response &res);
+  ros::Timer* shutdown_timer_;
+  ros::ServiceClient mission_planner_client_;
+
 };
 
 #endif  // GUIDANCE_MANAGER_HPP

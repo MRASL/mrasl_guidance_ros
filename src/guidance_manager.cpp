@@ -14,7 +14,11 @@
 #include <sensor_msgs/CameraInfo.h>
 #include <geometry_msgs/Vector3Stamped.h>
 #include <geometry_msgs/TwistStamped.h>
+#include <mrasl/MissionPlannerRequest.h>
+#include <mrasl/UpdateNodeStatus.h>
+#include <mrasl_guidance/guidanceConfig.h>
 
+#include <Definitions.h>
 #include <dji/guidance.h>
 #include <dji/utils.h>
 #include "guidance_manager.hpp"
@@ -54,6 +58,20 @@ e_sdk_err_code GuidanceManager::init(ros::NodeHandle pnh){
   pnh_ = pnh;
   config.applyFromNodeHandle(pnh_);
   it_ = new image_transport::ImageTransport(pnh_);
+
+  // init reconfigure callbacks
+  reconfigure_callback_type = boost::bind(&GuidanceManager::reconfigure_callback, this,
+     _1, _2);
+  reconfigure_server_.setCallback(reconfigure_callback_type);
+
+  mission_planner_service =
+          pnh_.advertiseService("/mission_main/guidance_request",
+          &GuidanceManager::missionPlannerCallback, this);
+  mission_planner_client_ =
+          pnh_.serviceClient<mrasl::UpdateNodeStatus>("/mission_main/update_node_status");
+  shutdown_timer_ = new ros::Timer(
+    pnh_.createTimer(ros::Duration(2.0),&GuidanceManager::shutdown_timerCallback,
+      this, true,false));
 
   // Init message buffers
   image_left_.image.create(IMG_HEIGHT, IMG_WIDTH, CV_8UC1);
@@ -308,6 +326,53 @@ void GuidanceManager::createImagePublisher(ros::NodeHandle nh,
     cinfo.P[7] = 0; // Ty
     right_cam_info_man[index]->setCameraInfo(cinfo);
   }
+}
+
+/**
+ * Callback for the dynamic reconfigure
+ * @param config
+ * @param level
+ */
+void GuidanceManager::reconfigure_callback(guidance::guidanceConfig &config, uint32_t level)
+{
+  set_maxDiff(config.maxDiff);
+  set_maxSpeckleSize(config.maxSpeckleSize);
+  set_maxDiffCpu(config.maxDiffCpu);
+  set_maxSpeckleSize(config.maxSpeckleSizeCpu);
+}
+
+/**
+ * callback executed when remote shutdown is asked
+ * @param e Timer event
+ */
+void GuidanceManager::shutdown_timerCallback(const ros::TimerEvent& e)
+{
+  ROS_WARN("Received Kill Signal.");
+
+  mrasl::UpdateNodeStatus srv;
+  srv.request.node_ID = mrasl::node_ID::GUIDANCE;
+  srv.request.node_status = mrasl::node_status::STATUS_STOP;
+  if(!mission_planner_client_.call(srv))
+  {
+    ROS_ERROR("Unable to contact mission planner.");
+  }
+
+  ros::shutdown();
+}
+
+bool GuidanceManager::missionPlannerCallback(mrasl::MissionPlannerRequest::Request &req,
+                            mrasl::MissionPlannerRequest::Response &res)
+{
+  ROS_INFO("Guidance mp req %d, id %d, stat %d", (int) req.node_request,
+           (int) req.node_ID, 0);
+    if(req.node_request == mrasl::REQUEST_ABORT ||
+       req.node_request == mrasl::REQUEST_STOP) {
+        stopTransfer();
+        releaseTransfer();
+        shutdown_timer_->setPeriod(ros::Duration(2.0),true);
+        shutdown_timer_->start();
+    }
+  return true;
 }
 
 void GuidanceManager::gpuBM(unsigned int index) {

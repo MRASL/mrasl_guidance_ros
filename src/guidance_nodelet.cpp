@@ -3,7 +3,6 @@
 
 #include "guidance_nodelet.h"
 
-PLUGINLIB_EXPORT_CLASS(mrasl_guidance::GuidanceNodelet, nodelet::Nodelet);
 
 GuidanceManager *GuidanceManager::s_instance_ = 0;
 namespace mrasl_guidance

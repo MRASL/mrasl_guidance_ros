@@ -31,6 +31,6 @@
   <depend>mrasl</depend>
 
   <export>
-    <nodelet plugin="${prefix}/nodelet_plugin.xml" />
+      <nodelet plugin="${prefix}/nodelet_guidance.xml" />
   </export>
 </package>
