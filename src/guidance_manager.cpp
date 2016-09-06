@@ -221,8 +221,8 @@ e_sdk_err_code GuidanceManager::init(ros::NodeHandle pnh){
     static_cast<e_sdk_err_code>(set_sdk_event_handler(guidance_data_rcvd_cb));
   RETURN_IF_ERR(err_code);
 
-  ROS_WARN("Set cameras to 10 Hz");
-  set_image_frequecy(e_frequecy_10);
+  ROS_WARN("Set cameras to 5 Hz");
+  set_image_frequecy(e_frequecy_5);
 
   std::cout << "start transfer" << std::endl;
   err_code = static_cast<e_sdk_err_code>(start_transfer());
