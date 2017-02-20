@@ -7,6 +7,9 @@ The `GuidanceManager` object is implemented as a singleton however, before reque
 ### Timestamps
 For now, timestamps are done relative to the ros clock whenever a message is received and parsed. We will need to figure out some sort of time sync thing.
 
+### Mission Planner
+The master branch still contains code referencing the mission planner. The mission planner was a service call for us to kill this node when the time came where we needed all the ressources from the onboard computer.
+
 ## Running
 At runtime, the GuidanceManager advertises all the possible topics for now. Maybe later, I can do better checking using parameters and stuff. Do note that due to the FPGA constraints in the Guidance, only two depth images can be computed at a time.
 
