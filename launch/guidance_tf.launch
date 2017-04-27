@@ -1,4 +1,29 @@
 <launch>
 
+  <arg name="pi/2" value="1.5707963267948966" />
+  <arg name="pi" value="3.14159265359" />
+
+  <arg name="optical_rotate" value="0.1 0.07 0.105 -$(arg pi/2) 0 -$(arg pi/2)" />
+  <!-- ENU -->
+  <!--node pkg="tf" type="static_transform_publisher" name="guidance1_link"
+    args="0.1 0.075 0.105 -$(arg pi/2) 0 -$(arg pi/2) m100 cam1_left 100" />
+  <node pkg="tf" type="static_transform_publisher" name="guidance2_link"
+    args="0.075 -0.1 -0.105 -$(arg pi) 0 -$(arg pi/2) m100 cam2_left 100" />
+  <node pkg="tf" type="static_transform_publisher" name="guidance4_link"
+    args="-0.075 0.1 -0.105 0 0 -$(arg pi/2) m100 cam4_left 100" />
+  <node pkg="tf" type="static_transform_publisher" name="guidance0_link"
+    args="0 0.075 -0.135 $(arg pi/2) $(arg pi) 0 m100 cam0_left 100" /-->
+  <node pkg="tf" type="static_transform_publisher" name="guidance1_link"
+    args="0.1 -0.075 -0.105 $(arg pi/2) 0 $(arg pi/2) m100 cam1_left 100" />
+  <node pkg="tf" type="static_transform_publisher" name="guidance2_link"
+    args="0.075 0.1 0.105 $(arg pi) 0 $(arg pi/2) m100 cam2_left 100" />
+  <node pkg="tf" type="static_transform_publisher" name="guidance4_link"
+    args="-0.075 -0.1 0.105 0 0 $(arg pi/2) m100 cam4_left 100" />
+  <node pkg="tf" type="static_transform_publisher" name="guidance0_link"
+    args="0 -0.075 0.135 $(arg pi/2) 0 0 m100 cam0_left 100" />
+
+
+  <!--node pkg="tf" type="static_transform_publisher" name="laser_base_link"
+    args="0.10 0 0.04 0 0 0 dji_m100 laser 100" /-->
 
 </launch>
