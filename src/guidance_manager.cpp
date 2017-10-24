@@ -3,9 +3,9 @@
 #include <string>
 #include <mutex>
 
-#include <opencv2/opencv.hpp>
-#include "opencv2/gpu/gpu.hpp"
+#include <opencv2/core.hpp>
 #include <cv_bridge/cv_bridge.h>
+
 #include <image_transport/image_transport.h>
 #include <stereo_msgs/DisparityImage.h>
 #include <sensor_msgs/Imu.h>
@@ -22,7 +22,7 @@
 
 #define CAM_LEFT true
 #define CAM_RIGHT false
-#define GRAVITY 9.80665
+#define GRAVITY 9.80665 
 
 std::mutex g_guidance_mutex;
 int guidance_data_rcvd_cb(int event, int data_len, char *content);
@@ -43,14 +43,14 @@ GuidanceManager::GuidanceManager(){
 }
 
 e_sdk_err_code GuidanceManager::init(ros::NodeHandle pnh){
-  sbm_cpu = new cv::StereoBM(cv::StereoBM::BASIC_PRESET, 64, 21);
-  sbm_cpu->state->preFilterCap = 9;
-  sbm_cpu->state->preFilterSize = 31;
-  sbm_cpu->state->minDisparity = 0;
-  sbm_cpu->state->uniquenessRatio = 15.0;
-  sbm_cpu->state->speckleWindowSize = 100;
-  sbm_cpu->state->speckleRange = 4;
-  sbm_cpu->state->textureThreshold = 10;
+  sbm_cpu = cv::StereoBM::create(64, 21);
+  sbm_cpu->setPreFilterCap(9);
+  sbm_cpu->setPreFilterSize(31);
+  sbm_cpu->setMinDisparity(0);
+  sbm_cpu->setUniquenessRatio(15.0);
+  sbm_cpu->setSpeckleWindowSize(100);
+  sbm_cpu->setSpeckleRange(4);
+  sbm_cpu->setTextureThreshold(10);
   pnh_ = pnh;
   config.applyFromNodeHandle(pnh_);
   it_ = new image_transport::ImageTransport(pnh_);
@@ -318,7 +318,7 @@ void GuidanceManager::gpuBM(unsigned int index) {
   //gpu_buf_.convertTo(gpu_buf16_, CV_16SC1);
   //cv::gpu::divide(gpu_buf16_, disp2depth_const_[index], gpu_buf16_);
   //gpu_buf16_.download(image_depth_.image);
-  (*sbm_cpu)( image_gpubm_buf_left_[index].image,
+  sbm_cpu->compute( image_gpubm_buf_left_[index].image,
               image_gpubm_buf_right_[index].image,
               image_depth_.image);
   cv::filterSpeckles(image_depth_.image, 25600, 120, 48, speckle_buf_);

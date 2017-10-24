@@ -19,6 +19,7 @@
 #include <dji/guidance.h>
 #include "guidance_configuration.hpp"
 #include <opencv2/opencv.hpp>
+using namespace std;
 #include <opencv2/gpu/gpu.hpp>
 
 /**
